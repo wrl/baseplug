@@ -1,0 +1,27 @@
+  __                             __              
+ |  |--.---.-.-----.-----.-----.|  |.--.--.-----.
+ |  _  |  _  |__ --|  -__|  _  ||  ||  |  |  _  |
+ |_____|___._|_____|_____|   __||__||_____|___  |
+                         |__|             |_____|
+ 
+  baseplug is a high-level model/view/controller-ish audio plugin framework.
+
+  nightly-only right now, because of GATs.
+
+  it's not ready, don't build anything important with it.
+  your users' sessions will break.
+  presets won't load right.
+  automation will be incorrect.
+
+  i'm making this public in its pre-pre-alpha state to get feedback from folks.
+
+  please file issues if things act weird or something's unclear.
+
+  do note that, though i have extensive experience in audio dev, i am largely a
+  neophyte when it comes to advanced rust usage, proper code style and best
+  practices. especially when it comes to error handling in procmacros.
+
+  best way to get in touch is to join the rust audio discord:
+    https://discord.gg/8rPCp9Q
+
+  -w
