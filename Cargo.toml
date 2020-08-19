@@ -3,6 +3,7 @@ name = "baseplug"
 version = "0.1.0"
 authors = ["William Light <git@wrl.lhiaudio.com>"]
 edition = "2018"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 num-traits = "0.2"
