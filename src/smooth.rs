@@ -88,7 +88,6 @@ impl<T> Smooth<T>
 
         match status {
             SmoothStatus::Active => {
-                println!("??? {} {}", (self.input - self.output[0]).abs(), epsilon);
                 if (self.input - self.output[0]).abs() < epsilon {
                     self.reset(self.input);
                     self.status = SmoothStatus::Deactivating;
