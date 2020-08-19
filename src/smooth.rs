@@ -147,13 +147,14 @@ impl<T> From<T> for Smooth<T>
     }
 }
 
-impl<T> ops::Index<usize> for Smooth<T>
-    where T: Float
+impl<T, I> ops::Index<I> for Smooth<T>
+    where I: slice::SliceIndex<[T]>,
+          T: Float
 {
-    type Output = T;
+    type Output = I::Output;
 
     #[inline]
-    fn index(&self, idx: usize) -> &T {
+    fn index(&self, idx: I) -> &I::Output {
         &self.output[idx]
     }
 }
