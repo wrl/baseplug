@@ -21,7 +21,7 @@ baseplug::model! {
         cutoff: f32,
 
         #[model(min = 0.0, max = 1.0)]
-        #[parameter(name = "resonance", gradient = "Linear")]
+        #[parameter(name = "resonance")]
         resonance: f32
     }
 }

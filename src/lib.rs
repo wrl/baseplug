@@ -94,11 +94,7 @@ pub trait Plugin {
     const PRODUCT: &'static str;
     const VENDOR: &'static str;
 
-    type Model:
-        Model
-        + Serialize + DeserializeOwned
-        + Default
-        + 'static;
+    type Model: Model + Serialize + DeserializeOwned;
 
     fn new(sample_rate: f32, model: &Self::Model) -> Self;
 
