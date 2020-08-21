@@ -94,11 +94,6 @@ pub trait Translatable<T, Model> {
     fn xlate_out(&self, param: &Param<Model>) -> f32;
 }
 
-pub struct Translate<T, Model> {
-    pub xlate_in: fn(&Param<Model>, f32) -> T,
-    pub xlate_out: fn(&Param<Model>, &T) -> f32
-}
-
 impl<Model> Translatable<f32, Model> for f32 {
     fn xlate_in(param: &Param<Model>, normalised: f32) -> f32 {
         let (min, max, gradient) = match &param.param_type {
