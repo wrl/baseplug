@@ -356,8 +356,8 @@ pub fn vst_plugin_main<T: Plugin>(host_cb: HostCallbackProc,
 
             numPrograms: 0,
             numParams: <T::Model as Model>::Smooth::PARAMS.len() as i32,
-            numInputs: 2,
-            numOutputs: 2,
+            numInputs: T::INPUT_CHANNELS as i32,
+            numOutputs: T::OUTPUT_CHANNELS as i32,
 
             flags: flags.bits(),
 

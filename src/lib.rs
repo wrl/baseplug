@@ -94,6 +94,9 @@ pub trait Plugin {
     const PRODUCT: &'static str;
     const VENDOR: &'static str;
 
+    const INPUT_CHANNELS: usize;
+    const OUTPUT_CHANNELS: usize;
+
     type Model: Model + Serialize + DeserializeOwned;
 
     fn new(sample_rate: f32, model: &Self::Model) -> Self;

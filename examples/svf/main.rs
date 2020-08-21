@@ -44,6 +44,9 @@ impl Plugin for SVFPlugin {
     const PRODUCT: &'static str = "svf lowpass";
     const VENDOR: &'static str = "spicy plugins & co";
 
+    const INPUT_CHANNELS: usize = 2;
+    const OUTPUT_CHANNELS: usize = 2;
+
     type Model = SVFModel;
 
     #[inline]

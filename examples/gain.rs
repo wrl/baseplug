@@ -37,6 +37,9 @@ impl Plugin for Gain {
     const PRODUCT: &'static str = "basic gain plug";
     const VENDOR: &'static str = "spicy plugins & co";
 
+    const INPUT_CHANNELS: usize = 2;
+    const OUTPUT_CHANNELS: usize = 2;
+
     type Model = GainModel;
 
     #[inline]
