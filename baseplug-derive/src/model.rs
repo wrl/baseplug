@@ -29,7 +29,6 @@ impl WrappingType {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
 struct ModelBounds {
     min: f32,
@@ -53,7 +52,6 @@ struct ParameterInfo {
     gradient: Option<String>
 }
 
-#[allow(dead_code)]
 struct FieldInfo<'a> {
     vis: &'a Visibility,
     ident: &'a Ident,
