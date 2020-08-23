@@ -29,7 +29,7 @@ pub use parameter::Param;
 pub mod event;
 pub use event::Event;
 
-mod wrapper;
+pub mod wrapper;
 
 pub use baseplug_derive::model;
 
