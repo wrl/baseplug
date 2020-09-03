@@ -89,7 +89,7 @@ pub trait SmoothModel<T: Model + Default>: Sized {
     fn process(&'_ mut self, nframes: usize) -> Self::Process<'_>;
 }
 
-pub trait Plugin {
+pub trait Plugin: Send + Sync {
     const NAME: &'static str;
     const PRODUCT: &'static str;
     const VENDOR: &'static str;
