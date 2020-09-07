@@ -59,4 +59,14 @@ impl Plugin for Gain {
     }
 }
 
+
 baseplug::vst2!(Gain, b"tAnE");
+fn make_cid () -> vst3_com::IID {
+    vst3_com::IID {
+        data: [0x44, 0xb0, 0xeb, 0xf7, 0x29, 0x55, 0x40, 0x6c, 0x8c, 0xcd, 0x69, 0xac, 0x57, 0xb1, 0x71, 0xb9]
+    }
+}
+
+baseplug::vst3!{Gain, "gain.example.com/vst3", "gain.support@example.com", crate::make_cid()}
+
+//$plugin:ident, $url:expr, $email:expr, $iid:expr

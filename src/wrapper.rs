@@ -4,7 +4,7 @@ use crate::{
 
     Plugin,
     Param,
-
+    parameter::Translatable,
     AudioBus,
     AudioBusMut,
     ProcessContext,
@@ -14,7 +14,7 @@ use crate::{
     event
 };
 
-pub(crate) struct WrappedPlugin<T: Plugin> {
+pub struct WrappedPlugin<T: Plugin> {
     plug: T,
 
     // even though it is *strongly forbidden* to allocate in the RT audio thread, many plugin APIs
@@ -27,13 +27,13 @@ pub(crate) struct WrappedPlugin<T: Plugin> {
     // see below in WrappedPlugin::new() for the capacity.
     events: Vec<Event<T>>,
 
-    pub(crate) smoothed_model: <T::Model as Model>::Smooth,
+    pub smoothed_model: <T::Model as Model>::Smooth,
     sample_rate: f32
 }
 
 impl<T: Plugin> WrappedPlugin<T> {
     #[inline]
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             plug: T::new(48000.0, &T::Model::default()),
             events: Vec::with_capacity(512),
@@ -48,7 +48,7 @@ impl<T: Plugin> WrappedPlugin<T> {
     ////
 
     #[inline]
-    pub(crate) fn set_sample_rate(&mut self, sample_rate: f32) {
+    pub fn set_sample_rate(&mut self, sample_rate: f32) {
         self.sample_rate = sample_rate;
         self.smoothed_model.set_sample_rate(sample_rate);
 
@@ -56,7 +56,7 @@ impl<T: Plugin> WrappedPlugin<T> {
     }
 
     #[inline]
-    pub(crate) fn reset(&mut self) {
+    pub fn reset(&mut self) {
         let model = self.smoothed_model.as_model();
         self.plug = T::new(self.sample_rate, &model);
         self.smoothed_model.reset(&model);
@@ -67,12 +67,12 @@ impl<T: Plugin> WrappedPlugin<T> {
     ////
 
     #[inline]
-    pub(crate) fn set_parameter(&mut self, param: &Param<<T::Model as Model>::Smooth>, val: f32) {
+    pub fn set_parameter(&mut self, param: &Param<<T::Model as Model>::Smooth>, val: f32) {
         param.set(&mut self.smoothed_model, val)
     }
 
     #[inline]
-    pub(crate) fn get_parameter(&self, param: &Param<<T::Model as Model>::Smooth>) -> f32 {
+    pub fn get_parameter(&self, param: &Param<<T::Model as Model>::Smooth>) -> f32 {
         param.get(&self.smoothed_model)
     }
 
@@ -80,7 +80,7 @@ impl<T: Plugin> WrappedPlugin<T> {
     // state
     ////
 
-    pub(crate) fn serialise(&self) -> Option<Vec<u8>>
+    pub fn serialise(&self) -> Option<Vec<u8>>
     {
         let ser = self.smoothed_model.as_model();
 
@@ -89,7 +89,7 @@ impl<T: Plugin> WrappedPlugin<T> {
             .ok()
     }
 
-    pub(crate) fn deserialise<'de>(&mut self, data: &'de [u8]) {
+    pub fn deserialise<'de>(&mut self, data: &'de [u8]) {
         let m: T::Model = match serde_json::from_slice(data) {
             Ok(m) => m,
             Err(_) => return
@@ -102,7 +102,7 @@ impl<T: Plugin> WrappedPlugin<T> {
     // events
     ////
 
-    pub(crate) fn enqueue_event(&mut self, ev: Event<T>) {
+    pub fn enqueue_event(&mut self, ev: Event<T>) {
         let latest_frame = match self.events.last() {
             Some(ev) => ev.frame,
             None => 0
@@ -139,7 +139,17 @@ impl<T: Plugin> WrappedPlugin<T> {
     }
 
     #[inline]
-    pub(crate) fn process(&mut self, musical_time: MusicalTime,
+    pub fn normalize(&self, param: &Param<<T::Model as Model>::Smooth>, val: f32) -> f32 {
+        val.xlate_out(param)
+    }
+
+    #[inline]
+    pub fn denormalize(&self, param: &Param<<T::Model as Model>::Smooth>, val: f32) -> f32 {
+        f32::xlate_in(param, val)
+    }
+
+    #[inline]
+    pub fn process(&mut self, musical_time: MusicalTime,
         input: [&[f32]; 2], mut output: [&mut [f32]; 2],
         mut nframes: usize)
     {
@@ -206,7 +216,7 @@ impl<T: Plugin> WrappedPlugin<T> {
         }
     }
 
-    pub(crate) fn midi_input(&mut self, frame: usize, data: [u8; 3]) {
+    pub fn midi_input(&mut self, frame: usize, data: [u8; 3]) {
         if !T::MIDI_INPUT {
             return
         }
