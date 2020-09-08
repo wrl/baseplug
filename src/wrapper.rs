@@ -150,16 +150,13 @@ impl<T: Plugin> WrappedPlugin<T> {
         while nframes > 0 {
             let mut block_frames = nframes;
 
-            if ev_idx < self.events.len() {
-                while start == self.events[ev_idx].frame {
-                    self.dispatch_event(ev_idx);
-                    ev_idx += 1;
-                }
+            while ev_idx < self.events.len() && start == self.events[ev_idx].frame {
+                self.dispatch_event(ev_idx);
+                ev_idx += 1;
+            }
 
-                if ev_idx < self.events.len() {
-                    block_frames = block_frames.min(
-                        self.events[ev_idx].frame - start);
-                }
+            if ev_idx < self.events.len() {
+                block_frames = block_frames.min(self.events[ev_idx].frame - start);
             }
 
             block_frames = block_frames.min(crate::MAX_BLOCKSIZE);
@@ -205,6 +202,8 @@ impl<T: Plugin> WrappedPlugin<T> {
             nframes -= block_frames;
             start += block_frames;
         }
+
+        self.events.clear();
     }
 }
 

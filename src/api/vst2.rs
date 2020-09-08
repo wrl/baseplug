@@ -148,6 +148,14 @@ impl<T: Plugin> VST2Adapter<T> {
             // events
             ////
 
+            OpCode::GetCurrentPresetName => {
+                return 0;
+            },
+
+            ////
+            // events
+            ////
+
             OpCode::ProcessEvents => unsafe {
                 let vst_events = &*(ptr as *const Events);
                 let ev_slice = slice::from_raw_parts(
