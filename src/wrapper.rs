@@ -3,6 +3,7 @@ use crate::{
     SmoothModel,
 
     Plugin,
+    MidiReceiver,
     Param,
 
     AudioBus,
@@ -131,7 +132,7 @@ impl<T: Plugin> WrappedPlugin<T> {
         use event::Data;
 
         match ev.data {
-            Data::Midi(m) => self.plug.midi_input(m),
+            Data::Midi(m) => self.dispatch_midi_event(m),
             Data::Parameter { param, val } => {
                 self.set_parameter(param, val);
             }
@@ -205,15 +206,42 @@ impl<T: Plugin> WrappedPlugin<T> {
             start += block_frames;
         }
     }
+}
 
-    pub(crate) fn midi_input(&mut self, frame: usize, data: [u8; 3]) {
-        if !T::MIDI_INPUT {
-            return
-        }
+pub(crate) trait WrappedPluginMidiInput {
+    fn wants_midi_input() -> bool;
 
+    fn midi_input(&mut self, frame: usize, data: [u8; 3]);
+    fn dispatch_midi_event(&mut self, data: [u8; 3]);
+}
+
+impl<T: Plugin> WrappedPluginMidiInput for WrappedPlugin<T> {
+    default fn wants_midi_input() -> bool {
+        false
+    }
+
+    default fn midi_input(&mut self, _frame: usize, _data: [u8; 3]) {
+        return
+    }
+
+    default fn dispatch_midi_event(&mut self, _data: [u8; 3]) {
+        return
+    }
+}
+
+impl<T: MidiReceiver> WrappedPluginMidiInput for WrappedPlugin<T> {
+    fn wants_midi_input() -> bool {
+        true
+    }
+
+    fn midi_input(&mut self, frame: usize, data: [u8; 3]) {
         self.enqueue_event(Event {
             frame,
             data: event::Data::Midi(data)
         })
+    }
+
+    fn dispatch_midi_event(&mut self, data: [u8; 3]) {
+        self.plug.midi_input(data)
     }
 }

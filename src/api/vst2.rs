@@ -334,9 +334,12 @@ fn process_replacing_f64(_effect: *mut AEffect, _in: *const *const f64,
 
 pub fn vst_plugin_main<T: Plugin>(host_cb: HostCallbackProc,
         unique_id: &[u8; 4]) -> *mut AEffect {
-    let flags =
-        PluginFlags::CAN_REPLACING
-        | PluginFlags::PROGRAM_CHUNKS;
+    let mut flags =
+        PluginFlags::CAN_REPLACING | PluginFlags::PROGRAM_CHUNKS;
+
+    if WrappedPlugin::<T>::wants_midi_input() {
+        flags |= PluginFlags::IS_SYNTH;
+    }
 
     let unique_id =
           (unique_id[0] as u32) << 24

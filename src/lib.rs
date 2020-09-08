@@ -1,7 +1,12 @@
 #![allow(incomplete_features)]
 #![feature(generic_associated_types)]
+#![feature(min_specialization)]
+#![feature(rustc_attrs)]
 
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{
+    Serialize,
+    de::DeserializeOwned
+};
 
 
 #[macro_use]
@@ -32,6 +37,7 @@ pub use event::Event;
 mod wrapper;
 
 pub use baseplug_derive::model;
+
 
 const MAX_BLOCKSIZE: usize = 128;
 
@@ -105,7 +111,9 @@ pub trait Plugin: Send + Sync {
         model: &<<Self::Model as Model>::Smooth
                     as SmoothModel<Self::Model>>::Process<'proc>,
         ctx: &'proc mut ProcessContext);
+}
 
-    const MIDI_INPUT: bool = false;
-    fn midi_input(&mut self, _data: [u8; 3]) {}
+#[rustc_specialization_trait]
+pub trait MidiReceiver: Plugin {
+    fn midi_input(&mut self, data: [u8; 3]);
 }
