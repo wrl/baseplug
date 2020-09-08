@@ -92,6 +92,7 @@ pub trait SmoothModel<T: Model + Default>: Sized {
     // set values from model without smoothing
     fn reset(&mut self, from: &T);
 
+    fn snapshot(&'_ mut self) -> Self::Process<'_>;
     fn process(&'_ mut self, nframes: usize) -> Self::Process<'_>;
 }
 
@@ -115,5 +116,6 @@ pub trait Plugin: Send + Sync {
 
 #[rustc_specialization_trait]
 pub trait MidiReceiver: Plugin {
-    fn midi_input(&mut self, data: [u8; 3]);
+    fn midi_input<'proc>(&mut self, model: &<<Self::Model as Model>::Smooth as SmoothModel<Self::Model>>::Process<'proc>,
+        data: [u8; 3]);
 }

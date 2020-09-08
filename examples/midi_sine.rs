@@ -10,7 +10,7 @@ use baseplug::{
     ProcessContext,
     Plugin,
     MidiReceiver,
-    util::*
+    util::db_to_coeff
 };
 
 
@@ -22,9 +22,13 @@ baseplug::model! {
             gradient = "Power(0.15)")]
         gain: f32,
 
-        #[model(min = 0.1, max = 0.9)]
+        #[model(min = 0.05, max = 0.95)]
         #[parameter(name = "phase distortion")]
-        pd: f32
+        pd: f32,
+
+        #[model(min = 220.0, max = 880.0)]
+        #[parameter(name = "a4 tuning", gradient = "Exponential")]
+        a4: f32
     }
 }
 
@@ -32,7 +36,8 @@ impl Default for MidiSineModel {
     fn default() -> Self {
         Self {
             gain: db_to_coeff(-3.0),
-            pd: 0.5
+            pd: 0.5,
+            a4: 440.0
         }
     }
 }
@@ -84,7 +89,9 @@ impl Oscillator {
 
 struct MidiSine {
     osc: Oscillator,
-    sample_rate: f32
+    sample_rate: f32,
+
+    freq_ratio: f32,
 }
 
 impl Plugin for MidiSine {
@@ -101,7 +108,9 @@ impl Plugin for MidiSine {
     fn new(sample_rate: f32, _model: &MidiSineModel) -> Self {
         Self {
             osc: Oscillator::new(),
-            sample_rate
+            sample_rate,
+
+            freq_ratio: 0.0
         }
     }
 
@@ -110,6 +119,10 @@ impl Plugin for MidiSine {
         let output = &mut ctx.outputs[0].buffers;
 
         for i in 0..ctx.nframes {
+            if model.a4.is_smoothing() {
+                self.osc.set_frequency((self.freq_ratio * model.a4[i]) as f64, self.sample_rate as f64);
+            }
+
             let wave = {
                 let phase = self.osc.pd_phase(model.pd[i]);
                 (phase * 2.0 * PI).cos()
@@ -123,11 +136,14 @@ impl Plugin for MidiSine {
 }
 
 impl MidiReceiver for MidiSine {
-    fn midi_input(&mut self, data: [u8; 3]) {
+    fn midi_input(&mut self, model: &MidiSineModelProcess, data: [u8; 3]) {
         match data[0] {
             // note on
             0x90 => {
-                let freq = ((data[1] as f32 - 69.0) / 12.0).exp2() * 440.0f32;
+                let ratio = ((data[1] as f32 - 69.0) / 12.0).exp2();
+                self.freq_ratio = ratio;
+
+                let freq = ratio * model.a4[0];
                 self.osc.set_frequency(freq as f64, self.sample_rate as f64);
             },
 

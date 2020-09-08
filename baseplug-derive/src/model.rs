@@ -360,6 +360,35 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
             }
         });
 
+    let snapshot_fields = fields_base.iter()
+        .map(|FieldInfo { ident, wrapping, .. }| {
+            match wrapping {
+                Some(WrappingType::Smooth) =>
+                    quote!(#ident: {
+                        let out = self.#ident.snapshot();
+
+                        ::baseplug::SmoothOutput {
+                            values: out.values,
+                            status: out.status
+                        }
+                    }),
+
+                Some(WrappingType::Declick) =>
+                    quote!(#ident: {
+                        let out = self.#ident.snapshot();
+
+                        ::baseplug::DeclickOutput {
+                            from: out.from,
+                            to: out.to,
+                            fade: out.fade,
+                            status: out.status
+                        }
+                    }),
+
+                None => quote!(#ident: &self.#ident)
+            }
+        });
+
     let set_statements = fields_base.iter()
         .map(|FieldInfo { ident, wrapping, .. }| {
             match wrapping {
@@ -474,6 +503,12 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
 
             fn set_sample_rate(&mut self, sample_rate: f32) {
                 #( #set_sample_rate_statements ;)*
+            }
+
+            fn snapshot<'proc>(&'proc mut self) -> Self::Process<'proc> {
+                #proc_ident {
+                    #( #snapshot_fields ),*
+                }
             }
 
             fn process<'proc>(&'proc mut self, nframes: usize) -> Self::Process<'proc> {

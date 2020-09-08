@@ -73,6 +73,19 @@ impl<T> Declick<T>
     }
 
     #[inline]
+    pub fn snapshot(&self) -> DeclickOutput<T> {
+        let fade = self.fade.snapshot();
+
+        DeclickOutput {
+            from: &self.current,
+            to: self.next.as_ref().unwrap_or(&self.current),
+
+            fade: fade.values,
+            status: fade.status
+        }
+    }
+
+    #[inline]
     pub fn dest(&self) -> &T {
         self.staged.as_ref()
             .or_else(|| self.next.as_ref())

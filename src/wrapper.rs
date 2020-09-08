@@ -241,6 +241,7 @@ impl<T: MidiReceiver> WrappedPluginMidiInput for WrappedPlugin<T> {
     }
 
     fn dispatch_midi_event(&mut self, data: [u8; 3]) {
-        self.plug.midi_input(data)
+        let model = self.smoothed_model.snapshot();
+        self.plug.midi_input(&model, data)
     }
 }

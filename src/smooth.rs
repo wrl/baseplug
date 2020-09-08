@@ -13,9 +13,23 @@ pub enum SmoothStatus {
     Deactivating
 }
 
+impl SmoothStatus {
+    #[inline]
+    fn is_active(&self) -> bool {
+        self != &SmoothStatus::Inactive
+    }
+}
+
 pub struct SmoothOutput<'a, T> {
     pub values: &'a [T],
     pub status: SmoothStatus
+}
+
+impl<'a, T> SmoothOutput<'a, T> {
+    #[inline]
+    pub fn is_smoothing(&self) -> bool {
+        self.status.is_active()
+    }
 }
 
 impl<'a, T, I> ops::Index<I> for SmoothOutput<'a, T>
@@ -83,6 +97,14 @@ impl<T> Smooth<T>
         }
     }
 
+    #[inline]
+    pub fn snapshot(&self) -> SmoothOutput<T> {
+        SmoothOutput {
+            values: slice::from_ref(&self.last_output),
+            status: self.status
+        }
+    }
+
     pub fn update_status_with_epsilon(&mut self, epsilon: T) -> SmoothStatus {
         let status = self.status;
 
@@ -122,7 +144,7 @@ impl<T> Smooth<T>
 
     #[inline]
     pub fn is_active(&self) -> bool {
-        self.status != SmoothStatus::Inactive
+        self.status.is_active()
     }
 }
 
