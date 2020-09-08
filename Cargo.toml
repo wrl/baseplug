@@ -26,3 +26,7 @@ crate-type = ["cdylib"]
 [[example]]
 name = "svf"
 crate-type = ["cdylib"]
+
+[[example]]
+name = "midi_sine"
+crate-type = ["cdylib"]
