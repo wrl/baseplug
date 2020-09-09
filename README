@@ -8,10 +8,19 @@
 
   nightly-only right now, because of GATs.
 
-  it's not ready, don't build anything important with it.
-  your users' sessions will break.
-  presets won't load right.
-  automation will be incorrect.
+  baseplug is still largely prototypal, but is maturing quickly. i highly
+  encourage looking at the examples and building experiments with it. though
+  there will be API breakage in the future, i do not see a significant
+  divergence from the existing structures.
+
+  with that said, baseplug is not currently in a place where you should *ship*
+  any plugins built with it. as the baseplug APIs change, there is a high
+  likelihood that your users' sessions will break, presets won't load
+  correctly, and automation will be incorrect.
+
+  the primary goal for the 0.1 milestone is resolving these issues of
+  forward-compatibility, and at that juncture we will lift the above advisement
+  against shipping plugins.
 
   i'm making this public in its pre-pre-alpha state to get feedback from folks.
 
