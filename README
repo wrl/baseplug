@@ -6,7 +6,7 @@
  
   baseplug is a high-level model/view/controller-ish audio plugin framework.
 
-  nightly-only right now, because of GATs.
+  nightly-only right now, because of GATs and min_specialization.
 
   baseplug is still largely prototypal, but is maturing quickly. i highly
   encourage looking at the examples and building experiments with it. though
