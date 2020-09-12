@@ -8,6 +8,8 @@ use serde::{
     de::DeserializeOwned
 };
 
+use raw_window_handle::RawWindowHandle;
+
 
 #[macro_use]
 pub mod util;
@@ -120,10 +122,12 @@ pub trait MidiReceiver: Plugin {
         data: [u8; 3]);
 }
 
+pub type WindowOpenResult = Result<(), ()>;
+
 #[rustc_specialization_trait]
 pub trait PluginUI: Plugin {
     fn ui_size(&self) -> (i16, i16);
 
-    fn ui_open(&mut self);
+    fn ui_open(&mut self, parent: RawWindowHandle) -> WindowOpenResult;
     fn ui_close(&mut self);
 }
