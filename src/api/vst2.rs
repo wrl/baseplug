@@ -3,14 +3,16 @@ use std::ptr;
 use std::io;
 use std::os::raw::c_void;
 
-use vst::api::*;
-use vst::host;
 use vst::api::consts::*;
 use vst::plugin::OpCode;
+use vst::editor::Rect;
+use vst::api::*;
+use vst::host;
 
 use crate::{
     Model,
     Plugin,
+    PluginUI,
     Parameters,
     Param,
     MusicalTime,
@@ -57,6 +59,8 @@ struct VST2Adapter<T: Plugin> {
     effect: AEffect,
     host_cb: HostCallbackProc,
     wrapped: WrappedPlugin<T>,
+
+    editor_rect: Rect,
 
     // when the VST2 host asks us for the chunk/data/state, the lifetime for that data extends
     // until the *next* time that the host asks us for state. this means we have to just hold this
@@ -206,6 +210,35 @@ impl<T: Plugin> VST2Adapter<T> {
             },
 
             ////
+            // editor
+            ////
+
+            OpCode::EditorGetRect => {
+                let ptr = ptr as *mut *mut c_void;
+
+                let (width, height) = match self.get_rect() {
+                    Some((w, h)) => (w, h),
+                    None => unsafe {
+                        *ptr = ptr::null_mut();
+                        return 0;
+                    }
+                };
+
+                self.editor_rect = Rect {
+                    top: 0,
+                    left: 0,
+                    bottom: height,
+                    right: width,
+                };
+
+                unsafe {
+                    // we never read from editor_rect, just set it.
+                    *ptr = (&self.editor_rect as *const _) as *mut c_void;
+                    return 1;
+                }
+            },
+
+            ////
             // ~who knows~
             ////
 
@@ -292,6 +325,22 @@ impl<T: Plugin> VST2Adapter<T> {
 
         let musical_time = self.get_musical_time();
         self.wrapped.process(musical_time, input, output, nframes as usize);
+    }
+}
+
+trait VST2UI {
+    fn get_rect(&self) -> Option<(i16, i16)>;
+}
+
+impl<T: Plugin> VST2UI for VST2Adapter<T> {
+    default fn get_rect(&self) -> Option<(i16, i16)> {
+        None
+    }
+}
+
+impl<T: PluginUI> VST2UI for VST2Adapter<T> {
+    fn get_rect(&self) -> Option<(i16, i16)> {
+        Some(self.wrapped.plug.ui_size())
     }
 }
 
@@ -394,6 +443,13 @@ pub fn vst_plugin_main<T: Plugin>(host_cb: HostCallbackProc,
         },
         
         host_cb,
+
+        editor_rect: Rect {
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+        },
 
         wrapped: WrappedPlugin::new(),
         state: None

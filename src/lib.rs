@@ -119,3 +119,11 @@ pub trait MidiReceiver: Plugin {
     fn midi_input<'proc>(&mut self, model: &<<Self::Model as Model>::Smooth as SmoothModel<Self::Model>>::Process<'proc>,
         data: [u8; 3]);
 }
+
+#[rustc_specialization_trait]
+pub trait PluginUI: Plugin {
+    fn ui_size(&self) -> (i16, i16);
+
+    fn ui_open(&mut self);
+    fn ui_close(&mut self);
+}
