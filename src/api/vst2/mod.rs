@@ -239,6 +239,17 @@ impl<T: Plugin> VST2Adapter<T> {
                 }
             },
 
+            OpCode::EditorOpen => {
+                return match self.ui_open(ptr) {
+                    Ok(_) => 1,
+                    Err(_) => 0,
+                };
+            },
+
+            OpCode::EditorClose => {
+                self.ui_close();
+            },
+
             ////
             // ~who knows~
             ////

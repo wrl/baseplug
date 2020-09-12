@@ -48,12 +48,18 @@ impl From<VST2WindowHandle> for RawWindowHandle {
 }
 
 pub(super) trait VST2UI {
+    fn has_ui() -> bool;
+
     fn ui_get_rect(&self) -> Option<(i16, i16)>;
     fn ui_open(&mut self, parent: *mut c_void) -> WindowOpenResult;
     fn ui_close(&mut self);
 }
 
 impl<T: Plugin> VST2UI for VST2Adapter<T> {
+    default fn has_ui() -> bool {
+        false
+    }
+
     default fn ui_get_rect(&self) -> Option<(i16, i16)> {
         None
     }
@@ -66,6 +72,10 @@ impl<T: Plugin> VST2UI for VST2Adapter<T> {
 }
 
 impl<T: PluginUI> VST2UI for VST2Adapter<T> {
+    fn has_ui() -> bool {
+        true
+    }
+
     fn ui_get_rect(&self) -> Option<(i16, i16)> {
         Some(self.wrapped.plug.ui_size())
     }

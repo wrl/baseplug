@@ -62,6 +62,10 @@ pub fn plugin_main<T: Plugin>(host_cb: HostCallbackProc, unique_id: &[u8; 4]) ->
         flags |= PluginFlags::IS_SYNTH;
     }
 
+    if VST2Adapter::<T>::has_ui() {
+        flags |= PluginFlags::HAS_EDITOR;
+    }
+
     let unique_id =
           (unique_id[0] as u32) << 24
         | (unique_id[1] as u32) << 16
