@@ -73,8 +73,8 @@ impl<T> Declick<T>
     }
 
     #[inline]
-    pub fn snapshot(&self) -> DeclickOutput<T> {
-        let fade = self.fade.snapshot();
+    pub fn current_value(&self) -> DeclickOutput<T> {
+        let fade = self.fade.current_value();
 
         DeclickOutput {
             from: &self.current,

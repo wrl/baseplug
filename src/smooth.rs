@@ -98,7 +98,7 @@ impl<T> Smooth<T>
     }
 
     #[inline]
-    pub fn snapshot(&self) -> SmoothOutput<T> {
+    pub fn current_value(&self) -> SmoothOutput<T> {
         SmoothOutput {
             values: slice::from_ref(&self.last_output),
             status: self.status

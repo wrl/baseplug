@@ -94,7 +94,7 @@ pub trait SmoothModel<T: Model + Default>: Sized {
     // set values from model without smoothing
     fn reset(&mut self, from: &T);
 
-    fn snapshot(&'_ mut self) -> Self::Process<'_>;
+    fn current_value(&'_ mut self) -> Self::Process<'_>;
     fn process(&'_ mut self, nframes: usize) -> Self::Process<'_>;
 }
 
