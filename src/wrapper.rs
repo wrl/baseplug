@@ -16,7 +16,7 @@ use crate::{
 };
 
 pub(crate) struct WrappedPlugin<T: Plugin> {
-    plug: T,
+    pub(crate) plug: T,
 
     // even though it is *strongly forbidden* to allocate in the RT audio thread, many plugin APIs
     // have no facilities for host-side allocation of event buffers which live through the

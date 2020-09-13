@@ -8,6 +8,8 @@ use serde::{
     de::DeserializeOwned
 };
 
+use raw_window_handle::RawWindowHandle;
+
 
 #[macro_use]
 pub mod util;
@@ -118,4 +120,14 @@ pub trait Plugin: Send + Sync {
 pub trait MidiReceiver: Plugin {
     fn midi_input<'proc>(&mut self, model: &<<Self::Model as Model>::Smooth as SmoothModel<Self::Model>>::Process<'proc>,
         data: [u8; 3]);
+}
+
+pub type WindowOpenResult = Result<(), ()>;
+
+#[rustc_specialization_trait]
+pub trait PluginUI: Plugin {
+    fn ui_size(&self) -> (i16, i16);
+
+    fn ui_open(&mut self, parent: RawWindowHandle) -> WindowOpenResult;
+    fn ui_close(&mut self);
 }

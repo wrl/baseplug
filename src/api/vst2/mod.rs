@@ -3,20 +3,23 @@ use std::ptr;
 use std::io;
 use std::os::raw::c_void;
 
-use vst::api::*;
-use vst::host;
 use vst::api::consts::*;
 use vst::plugin::OpCode;
+use vst::editor::Rect;
+use vst::api::*;
+use vst::host;
 
-use crate::{
-    Model,
-    Plugin,
-    Parameters,
-    Param,
-    MusicalTime,
-};
 
+use crate::*;
 use crate::wrapper::*;
+
+
+mod ui;
+use ui::*;
+
+mod abi;
+pub use abi::plugin_main as plugin_main;
+
 
 // vst-rs doesn't have this for some reason
 const MAX_EFFECT_NAME_LEN: usize = 32;
@@ -57,6 +60,8 @@ struct VST2Adapter<T: Plugin> {
     effect: AEffect,
     host_cb: HostCallbackProc,
     wrapped: WrappedPlugin<T>,
+
+    editor_rect: Rect,
 
     // when the VST2 host asks us for the chunk/data/state, the lifetime for that data extends
     // until the *next* time that the host asks us for state. this means we have to just hold this
@@ -206,6 +211,46 @@ impl<T: Plugin> VST2Adapter<T> {
             },
 
             ////
+            // editor
+            ////
+
+            OpCode::EditorGetRect => {
+                let ptr = ptr as *mut *mut c_void;
+
+                let (width, height) = match self.ui_get_rect() {
+                    Some((w, h)) => (w, h),
+                    None => unsafe {
+                        *ptr = ptr::null_mut();
+                        return 0;
+                    }
+                };
+
+                self.editor_rect = Rect {
+                    top: 0,
+                    left: 0,
+                    bottom: height,
+                    right: width,
+                };
+
+                unsafe {
+                    // we never read from editor_rect, just set it.
+                    *ptr = (&self.editor_rect as *const _) as *mut c_void;
+                    return 1;
+                }
+            },
+
+            OpCode::EditorOpen => {
+                return match self.ui_open(ptr) {
+                    Ok(_) => 1,
+                    Err(_) => 0,
+                };
+            },
+
+            OpCode::EditorClose => {
+                self.ui_close();
+            },
+
+            ////
             // ~who knows~
             ////
 
@@ -292,136 +337,5 @@ impl<T: Plugin> VST2Adapter<T> {
 
         let musical_time = self.get_musical_time();
         self.wrapped.process(musical_time, input, output, nframes as usize);
-    }
-}
-
-macro_rules! adapter_from_effect {
-    ($ptr:ident) => (
-        &mut *container_of!($ptr, VST2Adapter<T>, effect)
-    )
-}
-
-macro_rules! forward_to_adapter {
-    ($method:ident, ($($arg:ident: $ty:ty),+), $ret:ty) => {
-        fn $method<T: Plugin>(effect: *mut AEffect, $($arg: $ty,)+) -> $ret {
-            let adapter = unsafe { adapter_from_effect!(effect) };
-            adapter.$method($($arg,)+)
-        }
-    }
-}
-
-forward_to_adapter!(
-    dispatch,
-    (opcode: i32, index: i32, value: isize, ptr: *mut c_void, opt: f32),
-    isize);
-
-forward_to_adapter!(
-    get_parameter,
-    (index: i32),
-    f32);
-
-forward_to_adapter!(
-    set_parameter,
-    (index: i32, val: f32),
-    ());
-
-forward_to_adapter!(
-    process_replacing,
-    (in_buffers: *const *const f32, out_buffers: *mut *mut f32, nframes: i32),
-    ());
-
-fn process_deprecated(_effect: *mut AEffect, _in: *const *const f32,
-    _out: *mut *mut f32, _nframes: i32)
-{
-}
-
-fn process_replacing_f64(_effect: *mut AEffect, _in: *const *const f64,
-    _out: *mut *mut f64, _nframes: i32)
-{
-}
-
-pub fn vst_plugin_main<T: Plugin>(host_cb: HostCallbackProc,
-        unique_id: &[u8; 4]) -> *mut AEffect {
-    let mut flags =
-        PluginFlags::CAN_REPLACING | PluginFlags::PROGRAM_CHUNKS;
-
-    if WrappedPlugin::<T>::wants_midi_input() {
-        flags |= PluginFlags::IS_SYNTH;
-    }
-
-    let unique_id =
-          (unique_id[0] as u32) << 24
-        | (unique_id[1] as u32) << 16
-        | (unique_id[2] as u32) << 8
-        | (unique_id[3] as u32);
-
-    let adapter = Box::new(VST2Adapter::<T> {
-        effect: AEffect {
-            magic: VST_MAGIC,
-
-            dispatcher: dispatch::<T>,
-            setParameter: set_parameter::<T>,
-            getParameter: get_parameter::<T>,
-
-            _process: process_deprecated,
-
-            numPrograms: 0,
-            numParams: <T::Model as Model>::Smooth::PARAMS.len() as i32,
-            numInputs: T::INPUT_CHANNELS as i32,
-            numOutputs: T::OUTPUT_CHANNELS as i32,
-
-            flags: flags.bits(),
-
-            reserved1: 0,
-            reserved2: 0,
-
-            initialDelay: 0,
-
-            _realQualities: 0,
-            _offQualities: 0,
-            _ioRatio: 0.0,
-
-            object: ptr::null_mut(),
-            user: ptr::null_mut(),
-
-            uniqueId: unique_id as i32,
-            version: 0,
-
-            processReplacing: process_replacing::<T>,
-            processReplacingF64: process_replacing_f64,
-
-            future: [0u8; 56]
-        },
-        
-        host_cb,
-
-        wrapped: WrappedPlugin::new(),
-        state: None
-    });
-
-    unsafe {
-        &mut ((*Box::into_raw(adapter)).effect)
-    }
-}
-
-#[macro_export]
-macro_rules! vst2 {
-    ($plugin:ty, $unique_id:expr) => {
-        #[allow(non_snake_case)]
-        #[no_mangle]
-        pub extern "C" fn main(host_callback: ::vst::api::HostCallbackProc)
-            -> *mut ::vst::api::AEffect
-        {
-            VSTPluginMain(host_callback)
-        }
-
-        #[allow(non_snake_case)]
-        #[no_mangle]
-        pub extern "C" fn VSTPluginMain(host_callback: ::vst::api::HostCallbackProc)
-            -> *mut ::vst::api::AEffect
-        {
-            $crate::api::vst2::vst_plugin_main::<$plugin>(
-                host_callback, $unique_id)
-        }
     }
 }
