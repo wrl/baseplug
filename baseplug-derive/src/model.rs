@@ -228,11 +228,16 @@ impl<'a> FieldInfo<'a> {
             )
         };
 
+        let model_get = match self.wrapping {
+            None => quote!(model.#ident),
+            _ => quote!(model.#ident.dest())
+        };
+
         let display_cb = match param.unit.as_ref().map(|x| x.as_str()) {
             Some("Decibels") => quote!(
                 |param: &#pty, model: &#model, w: &mut ::std::io::Write| ->
                         ::std::io::Result<()> {
-                    let val = model.#ident.dest();
+                    let val = #model_get;
 
                     if val <= 0.00003162278 {
                         write!(w, "-inf")
@@ -245,20 +250,28 @@ impl<'a> FieldInfo<'a> {
             _ => quote!(
                 |param: &#pty, model: &#model, w: &mut ::std::io::Write| ->
                         ::std::io::Result<()> {
-                    write!(w, "{}", model.#ident.dest())
+                    write!(w, "{}", #model_get)
                 }
             ),
         };
 
-        let set_cb = quote!(
-            |param: &#pty, model: &mut #model, val: f32| {
-                model.#ident.set(val.xlate_from(param))
-            }
-        );
+        let set_cb = match self.wrapping {
+            None => quote!(
+                |param: &#pty, model: &mut #model, val: f32| {
+                    model.#ident = val.xlate_from(param);
+                }
+            ),
+
+            _ => quote!(
+                |param: &#pty, model: &mut #model, val: f32| {
+                    model.#ident.set(val.xlate_from(param))
+                }
+            )
+        };
 
         let get_cb = quote!(
             |param: &#pty, model: &#model| -> f32 {
-                model.#ident.dest().xlate_out(param)
+                #model_get.xlate_out(param)
             }
         );
 
