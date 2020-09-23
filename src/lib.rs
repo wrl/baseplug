@@ -1,6 +1,6 @@
 #![allow(incomplete_features)]
 #![feature(generic_associated_types)]
-#![feature(min_specialization)]
+#![feature(specialization)]
 #![feature(rustc_attrs)]
 
 use serde::{
@@ -100,12 +100,14 @@ pub trait MidiReceiver: Plugin {
         data: [u8; 3]);
 }
 
-pub type WindowOpenResult = Result<(), ()>;
+pub type WindowOpenResult<T> = Result<T, ()>;
 
 #[rustc_specialization_trait]
 pub trait PluginUI: Plugin {
-    fn ui_size(&self) -> (i16, i16);
+    type Handle;
 
-    fn ui_open(&mut self, parent: RawWindowHandle) -> WindowOpenResult;
-    fn ui_close(&mut self);
+    fn ui_size() -> (i16, i16);
+
+    fn ui_open(parent: RawWindowHandle) -> WindowOpenResult<Self::Handle>;
+    fn ui_close(handle: Self::Handle);
 }

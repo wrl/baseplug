@@ -63,6 +63,8 @@ struct VST2Adapter<T: Plugin> {
 
     editor_rect: Rect,
 
+    ui_handle: Option<<Self as VST2UI>::UIHandle>,
+
     // when the VST2 host asks us for the chunk/data/state, the lifetime for that data extends
     // until the *next* time that the host asks us for state. this means we have to just hold this
     // around in memory indefinitely.
