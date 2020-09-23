@@ -1,7 +1,6 @@
 #![allow(incomplete_features)]
 #![feature(generic_associated_types)]
 #![feature(specialization)]
-#![feature(rustc_attrs)]
 
 use serde::{
     Serialize,
@@ -94,7 +93,6 @@ pub trait Plugin: Send + Sync {
         ctx: &'proc mut ProcessContext);
 }
 
-#[rustc_specialization_trait]
 pub trait MidiReceiver: Plugin {
     fn midi_input<'proc>(&mut self, model: &<<Self::Model as Model>::Smooth as SmoothModel<Self::Model>>::Process<'proc>,
         data: [u8; 3]);
@@ -102,7 +100,6 @@ pub trait MidiReceiver: Plugin {
 
 pub type WindowOpenResult<T> = Result<T, ()>;
 
-#[rustc_specialization_trait]
 pub trait PluginUI: Plugin {
     type Handle;
 
