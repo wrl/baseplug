@@ -89,10 +89,12 @@ impl<P: PluginUI> VST2UI for VST2Adapter<P> {
     fn ui_open(&mut self, parent: *mut c_void) -> WindowOpenResult<()> {
         let parent = VST2WindowHandle(parent);
 
-        P::ui_open(parent.into())
-            .map(|handle| {
-                self.ui_handle = Some(handle);
-            })
+        if self.ui_handle.is_none() {
+            P::ui_open(parent.into())
+                .map(|handle| self.ui_handle = Some(handle))
+        } else {
+            Ok(())
+        }
     }
 
     fn ui_close(&mut self) {
