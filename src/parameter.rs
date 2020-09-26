@@ -1,6 +1,8 @@
+use std::marker::PhantomData;
 use std::fmt;
 use std::io;
 
+use crate::*;
 use crate::util::*;
 
 #[derive(Debug)]
@@ -28,25 +30,27 @@ pub enum Unit {
     Decibels
 }
 
-pub struct Format<Model> {
-    pub display_cb: fn(&Param<Model>, &Model, &mut dyn io::Write) -> io::Result<()>,
+pub struct Format<P: Plugin, Model> {
+    pub display_cb: fn(&Param<P, Model>, &Model, &mut dyn io::Write) -> io::Result<()>,
     pub label: &'static str
 }
 
-pub struct Param<Model> {
+pub struct Param<P: Plugin, Model> {
     pub name: &'static str,
     pub short_name: Option<&'static str>,
 
     pub unit: Unit,
 
     pub param_type: Type,
-    pub format: Format<Model>,
+    pub format: Format<P, Model>,
 
-    pub set_cb: fn(&Param<Model>, &mut Model, f32),
-    pub get_cb: fn(&Param<Model>, &Model) -> f32
+    pub set_cb: fn(&Param<P, Model>, &mut Model, f32),
+    pub get_cb: fn(&Param<P, Model>, &Model) -> f32,
+
+    pub _marker: PhantomData<P>
 }
 
-impl<Model> Param<Model> {
+impl<P: Plugin, Model> Param<P, Model> {
     #[inline]
     pub fn set(&self, model: &mut Model, val: f32) {
         (self.set_cb)(self, model, val)
@@ -78,7 +82,7 @@ impl<Model> Param<Model> {
     }
 }
 
-impl<Model> fmt::Debug for Param<Model> {
+impl<P: Plugin, Model> fmt::Debug for Param<P, Model> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Param")
             .field("name", &self.name)
@@ -89,13 +93,13 @@ impl<Model> fmt::Debug for Param<Model> {
     }
 }
 
-pub trait Translatable<T, Model> {
-    fn xlate_in(param: &Param<Model>, normalised: f32) -> T;
-    fn xlate_out(&self, param: &Param<Model>) -> f32;
+pub trait Translatable<T, P: Plugin, Model> {
+    fn xlate_in(param: &Param<P, Model>, normalised: f32) -> T;
+    fn xlate_out(&self, param: &Param<P, Model>) -> f32;
 }
 
-impl<Model> Translatable<f32, Model> for f32 {
-    fn xlate_in(param: &Param<Model>, normalised: f32) -> f32 {
+impl<P: Plugin, Model> Translatable<f32, P, Model> for f32 {
+    fn xlate_in(param: &Param<P, Model>, normalised: f32) -> f32 {
         let (min, max, gradient) = match &param.param_type {
             Type::Numeric { min, max, gradient } => (min, max, gradient)
         };
@@ -134,7 +138,7 @@ impl<Model> Translatable<f32, Model> for f32 {
         }
     }
 
-    fn xlate_out(&self, param: &Param<Model>) -> f32 {
+    fn xlate_out(&self, param: &Param<P, Model>) -> f32 {
         let (min, max, gradient) = match &param.param_type {
             Type::Numeric { min, max, gradient } => (min, max, gradient)
         };
@@ -173,17 +177,17 @@ impl<Model> Translatable<f32, Model> for f32 {
     }
 }
 
-pub trait TranslateFrom<F, T, Model>
-    where T: Translatable<T, Model>
+pub trait TranslateFrom<F, T, P: Plugin, Model>
+    where T: Translatable<T, P, Model>
 {
-    fn xlate_from(self, param: &Param<Model>) -> T;
+    fn xlate_from(self, param: &Param<P, Model>) -> T;
 }
 
-impl<T, Model> TranslateFrom<f32, T, Model> for f32
-    where T: Translatable<T, Model>
+impl<T, P: Plugin, Model> TranslateFrom<f32, T, P, Model> for f32
+    where T: Translatable<T, P, Model>
 {
     #[inline]
-    fn xlate_from(self, param: &Param<Model>) -> T {
+    fn xlate_from(self, param: &Param<P, Model>) -> T {
         T::xlate_in(param, self)
     }
 }

@@ -41,7 +41,7 @@ fn cstrcpy(ptr: *mut c_void, src: &str, max_len: usize) {
 }
 
 #[inline]
-fn param_for_vst2_id<P, M>(id: i32) -> Option<&'static Param<M::Smooth>>
+fn param_for_vst2_id<P, M>(id: i32) -> Option<&'static Param<P, M::Smooth>>
     where P: Plugin,
           M: Model<P>
 {

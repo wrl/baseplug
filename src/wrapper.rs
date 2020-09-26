@@ -68,12 +68,12 @@ impl<P: Plugin> WrappedPlugin<P> {
     ////
 
     #[inline]
-    pub(crate) fn set_parameter(&mut self, param: &Param<<P::Model as Model<P>>::Smooth>, val: f32) {
+    pub(crate) fn set_parameter(&mut self, param: &Param<P, <P::Model as Model<P>>::Smooth>, val: f32) {
         param.set(&mut self.smoothed_model, val)
     }
 
     #[inline]
-    pub(crate) fn get_parameter(&self, param: &Param<<P::Model as Model<P>>::Smooth>) -> f32 {
+    pub(crate) fn get_parameter(&self, param: &Param<P, <P::Model as Model<P>>::Smooth>) -> f32 {
         param.get(&self.smoothed_model)
     }
 

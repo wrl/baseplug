@@ -195,7 +195,7 @@ impl<'a> FieldInfo<'a> {
             None => return None
         };
 
-        let pty = quote!(::baseplug::Param<#model>);
+        let pty = quote!(::baseplug::Param<P, #model>);
 
         let ident = &self.ident;
         let name = &param.name;
@@ -276,7 +276,7 @@ impl<'a> FieldInfo<'a> {
         );
 
         Some(quote!(
-            const #ident: #pty = ::baseplug::Param {
+            ::baseplug::Param {
                 name: #name,
                 short_name: #short_name,
 
@@ -285,12 +285,14 @@ impl<'a> FieldInfo<'a> {
                 param_type: #param_type,
                 format: ::baseplug::parameter::Format {
                     display_cb: #display_cb,
-                    label: #label,
+                    label: #label
                 },
 
                 set_cb: #set_cb,
-                get_cb: #get_cb
-            };
+                get_cb: #get_cb,
+
+                _marker: ::std::marker::PhantomData
+            }
         ))
     }
 }
@@ -460,15 +462,11 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
     let smoothed_ident = format_ident!("{}Smooth", model_name);
     let proc_ident = format_ident!("{}Process", model_name);
 
+    let impl_params = format_ident!("_IMPL_PARAMETERS_FOR_{}", model_name);
+
     let parameters = fields_base.iter()
         .filter_map(|field: &FieldInfo|
             field.parameter_repr(&smoothed_ident));
-
-    let param_array_entries = fields_base.iter()
-        .filter_map(|field : &FieldInfo| {
-            field.parameter_info.as_ref()
-                .map(|_| field.ident)
-        });
 
     quote!(
         #( #attrs )*
@@ -533,22 +531,19 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
             }
         }
 
-        #[allow(non_upper_case_globals)]
-        #model_vis mod params {
-            use super::#smoothed_ident;
-
+        #[doc(hidden)]
+        #[allow(non_upper_case_globals, unused_attributes, unused_qualifications)]
+        const #impl_params: () = {
             use ::baseplug::parameter::{
                 Translatable,
                 TranslateFrom
             };
 
-            #( pub(crate) #parameters )*
-        }
-
-        impl ::baseplug::Parameters<#smoothed_ident> for #smoothed_ident {
-            const PARAMS: &'static [&'static ::baseplug::Param<#smoothed_ident>] = &[
-                #( &params::#param_array_entries ),*
-            ];
-        }
+            impl<P: ::baseplug::Plugin> ::baseplug::Parameters<P, #smoothed_ident> for #smoothed_ident {
+                const PARAMS: &'static [&'static ::baseplug::Param<P, #smoothed_ident>] = &[
+                    #( & #parameters ),*
+                ];
+            }
+        };
     )
 }

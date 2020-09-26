@@ -6,25 +6,25 @@ use crate::{
     Param
 };
 
-pub enum Data<T: Plugin> {
+pub enum Data<P: Plugin> {
     Midi([u8; 3]),
 
     Parameter {
-        param: &'static Param<<T::Model as Model<T>>::Smooth>,
+        param: &'static Param<P, <P::Model as Model<P>>::Smooth>,
         val: f32
     }
 }
 
-pub struct Event<T: Plugin> {
+pub struct Event<P: Plugin> {
     pub frame: usize,
-    pub data: Data<T>
+    pub data: Data<P>
 }
 
 ////
 // debug impls
 ////
 
-impl<T: Plugin> fmt::Debug for Data<T> {
+impl<P: Plugin> fmt::Debug for Data<P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Data::Midi(m) =>
@@ -41,7 +41,7 @@ impl<T: Plugin> fmt::Debug for Data<T> {
     }
 }
 
-impl<T: Plugin> fmt::Debug for Event<T> {
+impl<P: Plugin> fmt::Debug for Event<P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Event")
             .field("frame", &self.frame)
