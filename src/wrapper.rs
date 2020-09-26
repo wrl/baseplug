@@ -15,8 +15,8 @@ use crate::{
     event
 };
 
-pub(crate) struct WrappedPlugin<T: Plugin> {
-    pub(crate) plug: T,
+pub(crate) struct WrappedPlugin<P: Plugin> {
+    pub(crate) plug: P,
 
     // even though it is *strongly forbidden* to allocate in the RT audio thread, many plugin APIs
     // have no facilities for host-side allocation of event buffers which live through the
@@ -26,20 +26,20 @@ pub(crate) struct WrappedPlugin<T: Plugin> {
     // enlarge it.
     //
     // see below in WrappedPlugin::new() for the capacity.
-    events: Vec<Event<T>>,
+    events: Vec<Event<P>>,
 
-    pub(crate) smoothed_model: <T::Model as Model>::Smooth,
+    pub(crate) smoothed_model: <P::Model as Model<P>>::Smooth,
     sample_rate: f32
 }
 
-impl<T: Plugin> WrappedPlugin<T> {
+impl<P: Plugin> WrappedPlugin<P> {
     #[inline]
     pub(crate) fn new() -> Self {
         Self {
-            plug: T::new(48000.0, &T::Model::default()),
+            plug: P::new(48000.0, &P::Model::default()),
             events: Vec::with_capacity(512),
             smoothed_model:
-                <T::Model as Model>::Smooth::from_model(T::Model::default()),
+                <P::Model as Model<P>>::Smooth::from_model(P::Model::default()),
             sample_rate: 0.0
         }
     }
@@ -59,7 +59,7 @@ impl<T: Plugin> WrappedPlugin<T> {
     #[inline]
     pub(crate) fn reset(&mut self) {
         let model = self.smoothed_model.as_model();
-        self.plug = T::new(self.sample_rate, &model);
+        self.plug = P::new(self.sample_rate, &model);
         self.smoothed_model.reset(&model);
     }
 
@@ -68,12 +68,12 @@ impl<T: Plugin> WrappedPlugin<T> {
     ////
 
     #[inline]
-    pub(crate) fn set_parameter(&mut self, param: &Param<<T::Model as Model>::Smooth>, val: f32) {
+    pub(crate) fn set_parameter(&mut self, param: &Param<<P::Model as Model<P>>::Smooth>, val: f32) {
         param.set(&mut self.smoothed_model, val)
     }
 
     #[inline]
-    pub(crate) fn get_parameter(&self, param: &Param<<T::Model as Model>::Smooth>) -> f32 {
+    pub(crate) fn get_parameter(&self, param: &Param<<P::Model as Model<P>>::Smooth>) -> f32 {
         param.get(&self.smoothed_model)
     }
 
@@ -91,7 +91,7 @@ impl<T: Plugin> WrappedPlugin<T> {
     }
 
     pub(crate) fn deserialise<'de>(&mut self, data: &'de [u8]) {
-        let m: T::Model = match serde_json::from_slice(data) {
+        let m: P::Model = match serde_json::from_slice(data) {
             Ok(m) => m,
             Err(_) => return
         };
@@ -103,7 +103,7 @@ impl<T: Plugin> WrappedPlugin<T> {
     // events
     ////
 
-    pub(crate) fn enqueue_event(&mut self, ev: Event<T>) {
+    pub(crate) fn enqueue_event(&mut self, ev: Event<P>) {
         let latest_frame = match self.events.last() {
             Some(ev) => ev.frame,
             None => 0

@@ -75,7 +75,13 @@ pub trait Parameters<T: 'static> {
     const PARAMS: &'static [&'static Param<T>];
 }
 
-pub trait Plugin: Send + Sync {
+macro_rules! proc_model {
+    ($plug:ident, $lifetime:lifetime) => {
+        <<$plug::Model as Model<$plug>>::Smooth as SmoothModel<$plug, $plug::Model>>::Process<$lifetime>
+    }
+}
+
+pub trait Plugin: Sized + Send + Sync {
     const NAME: &'static str;
     const PRODUCT: &'static str;
     const VENDOR: &'static str;
@@ -83,18 +89,17 @@ pub trait Plugin: Send + Sync {
     const INPUT_CHANNELS: usize;
     const OUTPUT_CHANNELS: usize;
 
-    type Model: Model + Serialize + DeserializeOwned;
+    type Model: Model<Self> + Serialize + DeserializeOwned;
 
     fn new(sample_rate: f32, model: &Self::Model) -> Self;
 
     fn process<'proc>(&mut self,
-        model: &<<Self::Model as Model>::Smooth
-                    as SmoothModel<Self::Model>>::Process<'proc>,
+        model: &proc_model!(Self, 'proc),
         ctx: &'proc mut ProcessContext);
 }
 
 pub trait MidiReceiver: Plugin {
-    fn midi_input<'proc>(&mut self, model: &<<Self::Model as Model>::Smooth as SmoothModel<Self::Model>>::Process<'proc>,
+    fn midi_input<'proc>(&mut self, model: &proc_model!(Self, 'proc),
         data: [u8; 3]);
 }
 

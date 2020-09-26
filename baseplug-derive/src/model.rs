@@ -486,12 +486,12 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
         }
 
         #[doc(hidden)]
-        impl ::baseplug::Model for #model_name {
+        impl<P: ::baseplug::Plugin> ::baseplug::Model<P> for #model_name {
             type Smooth = #smoothed_ident;
         }
 
         #[doc(hidden)]
-        impl ::baseplug::SmoothModel<#model_name> for #smoothed_ident {
+        impl<P: ::baseplug::Plugin> ::baseplug::SmoothModel<P, #model_name> for #smoothed_ident {
             type Process<'proc> = #proc_ident<'proc>;
 
             fn from_model(model: #model_name) -> Self {

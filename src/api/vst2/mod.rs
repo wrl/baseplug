@@ -41,25 +41,26 @@ fn cstrcpy(ptr: *mut c_void, src: &str, max_len: usize) {
 }
 
 #[inline]
-fn param_for_vst2_id<T>(id: i32) -> Option<&'static Param<T::Smooth>>
-    where T: Model
+fn param_for_vst2_id<P, M>(id: i32) -> Option<&'static Param<M::Smooth>>
+    where P: Plugin,
+          M: Model<P>
 {
-    T::Smooth::PARAMS.get(id as usize).copied()
+    M::Smooth::PARAMS.get(id as usize).copied()
 }
 
 macro_rules! param_for_idx {
     ($id:ident) => {
-        match param_for_vst2_id::<T::Model>($id) {
+        match param_for_vst2_id::<P, P::Model>($id) {
             Some(p) => p,
             None => return 0
         }
     }
 }
 
-struct VST2Adapter<T: Plugin> {
+struct VST2Adapter<P: Plugin> {
     effect: AEffect,
     host_cb: HostCallbackProc,
-    wrapped: WrappedPlugin<T>,
+    wrapped: WrappedPlugin<P>,
 
     editor_rect: Rect,
 
@@ -71,7 +72,7 @@ struct VST2Adapter<T: Plugin> {
     state: Option<Vec<u8>>
 }
 
-impl<T: Plugin> VST2Adapter<T> {
+impl<P: Plugin> VST2Adapter<P> {
     #[inline]
     fn dispatch(&mut self, opcode: i32, index: i32, value: isize, ptr: *mut c_void, opt: f32) -> isize {
         match OpCode::from(opcode) {
@@ -137,17 +138,17 @@ impl<T: Plugin> VST2Adapter<T> {
             ////
 
             OpCode::GetEffectName => {
-                cstrcpy(ptr, T::NAME, MAX_EFFECT_NAME_LEN);
+                cstrcpy(ptr, P::NAME, MAX_EFFECT_NAME_LEN);
                 return 1;
             },
 
             OpCode::GetProductName => {
-                cstrcpy(ptr, T::PRODUCT, MAX_PRODUCT_STR_LEN);
+                cstrcpy(ptr, P::PRODUCT, MAX_PRODUCT_STR_LEN);
                 return 1;
             },
 
             OpCode::GetVendorName => {
-                cstrcpy(ptr, T::VENDOR, MAX_VENDOR_STR_LEN);
+                cstrcpy(ptr, P::VENDOR, MAX_VENDOR_STR_LEN);
                 return 1;
             },
 
@@ -266,7 +267,7 @@ impl<T: Plugin> VST2Adapter<T> {
 
     #[inline]
     fn get_parameter(&self, index: i32) -> f32 {
-        let param = match param_for_vst2_id::<T::Model>(index) {
+        let param = match param_for_vst2_id::<P, P::Model>(index) {
             Some(p) => p,
             None => return 0.0
         };
@@ -276,7 +277,7 @@ impl<T: Plugin> VST2Adapter<T> {
 
     #[inline]
     fn set_parameter(&mut self, index: i32, val: f32) {
-        let param = match param_for_vst2_id::<T::Model>(index) {
+        let param = match param_for_vst2_id::<P, P::Model>(index) {
             Some(p) => p,
             None => return
         };

@@ -1,14 +1,14 @@
-use crate::Parameters;
+use crate::*;
 
 
-pub trait Model: Sized + Default {
+pub trait Model<P: Plugin>: Sized + Default {
     type Smooth:
-        SmoothModel<Self>
+        SmoothModel<P, Self>
         + Parameters<Self::Smooth>
         + 'static;
 }
 
-pub trait SmoothModel<T: Model>: Sized {
+pub trait SmoothModel<P: Plugin, T: Model<P>>: Sized {
     type Process<'proc>;
 
     fn from_model(model: T) -> Self;

@@ -54,15 +54,15 @@ fn process_replacing_f64(_effect: *mut AEffect, _in: *const *const f64,
 {
 }
 
-pub fn plugin_main<T: Plugin>(host_cb: HostCallbackProc, unique_id: &[u8; 4]) -> *mut AEffect {
+pub fn plugin_main<P: Plugin>(host_cb: HostCallbackProc, unique_id: &[u8; 4]) -> *mut AEffect {
     let mut flags =
         PluginFlags::CAN_REPLACING | PluginFlags::PROGRAM_CHUNKS;
 
-    if WrappedPlugin::<T>::wants_midi_input() {
+    if WrappedPlugin::<P>::wants_midi_input() {
         flags |= PluginFlags::IS_SYNTH;
     }
 
-    if VST2Adapter::<T>::has_ui() {
+    if VST2Adapter::<P>::has_ui() {
         flags |= PluginFlags::HAS_EDITOR;
     }
 
@@ -72,20 +72,20 @@ pub fn plugin_main<T: Plugin>(host_cb: HostCallbackProc, unique_id: &[u8; 4]) ->
         | (unique_id[2] as u32) << 8
         | (unique_id[3] as u32);
 
-    let adapter = Box::new(VST2Adapter::<T> {
+    let adapter = Box::new(VST2Adapter::<P> {
         effect: AEffect {
             magic: VST_MAGIC,
 
-            dispatcher: dispatch::<T>,
-            setParameter: set_parameter::<T>,
-            getParameter: get_parameter::<T>,
+            dispatcher: dispatch::<P>,
+            setParameter: set_parameter::<P>,
+            getParameter: get_parameter::<P>,
 
             _process: process_deprecated,
 
             numPrograms: 0,
-            numParams: <T::Model as Model>::Smooth::PARAMS.len() as i32,
-            numInputs: T::INPUT_CHANNELS as i32,
-            numOutputs: T::OUTPUT_CHANNELS as i32,
+            numParams: <P::Model as Model<P>>::Smooth::PARAMS.len() as i32,
+            numInputs: P::INPUT_CHANNELS as i32,
+            numOutputs: P::OUTPUT_CHANNELS as i32,
 
             flags: flags.bits(),
 
@@ -104,7 +104,7 @@ pub fn plugin_main<T: Plugin>(host_cb: HostCallbackProc, unique_id: &[u8; 4]) ->
             uniqueId: unique_id as i32,
             version: 0,
 
-            processReplacing: process_replacing::<T>,
+            processReplacing: process_replacing::<P>,
             processReplacingF64: process_replacing_f64,
 
             future: [0u8; 56]

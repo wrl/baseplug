@@ -10,7 +10,7 @@ pub enum Data<T: Plugin> {
     Midi([u8; 3]),
 
     Parameter {
-        param: &'static Param<<T::Model as Model>::Smooth>,
+        param: &'static Param<<T::Model as Model<T>>::Smooth>,
         val: f32
     }
 }
