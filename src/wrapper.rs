@@ -26,6 +26,10 @@ pub(crate) struct WrappedPlugin<P: Plugin> {
     // enlarge it.
     //
     // see below in WrappedPlugin::new() for the capacity.
+    //
+    // XXX: there are *potential* threading issues with this. it would be completely possible for
+    // an enqueue_event() call to come *during* a process() call, and we need to be able to handle
+    // that in the future. we may need to use a different data structure here.
     events: Vec<Event<P>>,
 
     pub(crate) smoothed_model: <P::Model as Model<P>>::Smooth,
@@ -68,13 +72,31 @@ impl<P: Plugin> WrappedPlugin<P> {
     ////
 
     #[inline]
-    pub(crate) fn set_parameter(&mut self, param: &Param<P, <P::Model as Model<P>>::Smooth>, val: f32) {
-        param.set(&mut self.smoothed_model, val)
+    pub(crate) fn get_parameter(&self, param: &Param<P, <P::Model as Model<P>>::Smooth>) -> f32 {
+        param.get(&self.smoothed_model)
     }
 
     #[inline]
-    pub(crate) fn get_parameter(&self, param: &Param<P, <P::Model as Model<P>>::Smooth>) -> f32 {
-        param.get(&self.smoothed_model)
+    pub(crate) fn set_parameter(&mut self, param: &'static Param<P, <P::Model as Model<P>>::Smooth>, val: f32) {
+        if param.dsp_notify.is_some() {
+            self.enqueue_event(Event {
+                frame: 0,
+                data: event::Data::Parameter {
+                    param,
+                    val
+                }
+            });
+        } else {
+            param.set(&mut self.smoothed_model, val);
+        }
+    }
+
+    fn set_parameter_from_event(&mut self, param: &Param<P, <P::Model as Model<P>>::Smooth>, val: f32) {
+        param.set(&mut self.smoothed_model, val);
+
+        if let Some(dsp_notify) = param.dsp_notify {
+            dsp_notify(&mut self.plug);
+        }
     }
 
     ////
@@ -134,7 +156,7 @@ impl<P: Plugin> WrappedPlugin<P> {
         match ev.data {
             Data::Midi(m) => self.dispatch_midi_event(m),
             Data::Parameter { param, val } => {
-                self.set_parameter(param, val);
+                self.set_parameter_from_event(param, val);
             }
         }
     }

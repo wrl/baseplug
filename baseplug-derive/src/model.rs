@@ -49,7 +49,8 @@ struct ParameterInfo {
     short_name: Option<String>,
     label: Option<String>,
     unit: Option<String>,
-    gradient: Option<String>
+    gradient: Option<String>,
+    dsp_notify: Option<String>
 }
 
 struct FieldInfo<'a> {
@@ -128,6 +129,7 @@ impl<'a> FieldInfo<'a> {
         let mut label = None;
         let mut unit = None;
         let mut gradient = None;
+        let mut dsp_notify = None;
 
         nested.iter()
             .filter_map(|attr| {
@@ -152,6 +154,7 @@ impl<'a> FieldInfo<'a> {
                 ("label", s) => label = Some(s),
                 ("unit", s) => unit = Some(s),
                 ("gradient", s) => gradient = Some(s),
+                ("dsp_notify", s) => dsp_notify = Some(s),
 
                 (ident, _) => panic!("unexpected attribute \"{}\"", ident)
             }
@@ -164,7 +167,8 @@ impl<'a> FieldInfo<'a> {
             short_name,
             label,
             unit,
-            gradient
+            gradient,
+            dsp_notify
         });
     }
 
@@ -203,6 +207,12 @@ impl<'a> FieldInfo<'a> {
             .map_or_else(|| quote!(None), |sn| quote!(Some(#sn)));
         let label = param.label.as_ref()
             .map_or_else(|| quote!(""), |l| quote!(#l));
+
+        let dsp_notify = param.dsp_notify.as_ref()
+            .map_or_else(|| quote!(None), |dn| {
+                let dn = TokenStream::from_str(dn).unwrap();
+                quote!(Some(#dn))
+            });
 
         let unit = param.unit.as_ref()
             .map_or_else(
@@ -288,10 +298,10 @@ impl<'a> FieldInfo<'a> {
                     label: #label
                 },
 
-                set_cb: #set_cb,
-                get_cb: #get_cb,
+                dsp_notify: #dsp_notify,
 
-                _marker: ::std::marker::PhantomData
+                set_cb: #set_cb,
+                get_cb: #get_cb
             }
         ))
     }
