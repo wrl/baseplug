@@ -24,7 +24,7 @@ pub struct Declick<T: Sized + Clone> {
 }
 
 impl<T> Declick<T>
-    where T: Sized + Clone
+    where T: Sized + Clone + Eq
 {
     pub fn new(initial: T) -> Self {
         Self {
@@ -45,6 +45,10 @@ impl<T> Declick<T>
     }
 
     pub fn set(&mut self, to: T) {
+        if self.dest() == &to {
+            return
+        }
+
         if self.next.is_none() {
             self.next = Some(to);
 
