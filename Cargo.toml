@@ -14,8 +14,9 @@ serde_json = "1.0"
 vst = "0.2"
 raw-window-handle = "0.3"
 
-[dev-dependencies]
-packed_simd = "0.3"
+[dev-dependencies.packed_simd]
+version = "0.3"
+package = "packed_simd_2"
 
 [dependencies.baseplug-derive]
 path = "baseplug-derive"
