@@ -111,6 +111,9 @@ pub type WindowOpenResult<T> = Result<(T, Option<WindowInfo>), ()>;
 pub trait PluginUI: Plugin {
     type Handle;
 
+    /// For hosts that ask for the window size before they open the editor
+    fn ui_logical_size() -> (u32, u32);
+
     fn ui_open(parent: RawWindowHandle) -> WindowOpenResult<Self::Handle>;
     fn ui_close(handle: Self::Handle);
 }

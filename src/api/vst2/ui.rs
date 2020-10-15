@@ -89,7 +89,8 @@ impl<P: PluginUI> VST2UI for VST2Adapter<P> {
                 window_info.physical_height() as i16,
             ))
         } else {
-            None
+            let ui_size = P::ui_logical_size();
+            Some((ui_size.0 as i16, ui_size.1 as i16))
         }
     }
 
