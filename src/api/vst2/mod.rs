@@ -13,7 +13,6 @@ use vst::host;
 use crate::*;
 use crate::wrapper::*;
 
-
 mod ui;
 use ui::*;
 
@@ -63,6 +62,7 @@ struct VST2Adapter<P: Plugin> {
     wrapped: WrappedPlugin<P>,
 
     editor_rect: Rect,
+    window_info: Option<WindowInfo>,
 
     ui_handle: Option<<Self as VST2UI>::UIHandle>,
 

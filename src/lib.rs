@@ -40,6 +40,9 @@ pub use parameter::Param;
 
 mod wrapper;
 
+mod window_info;
+pub use window_info::WindowInfo;
+
 pub use baseplug_derive::model;
 
 
@@ -103,12 +106,10 @@ pub trait MidiReceiver: Plugin {
         data: [u8; 3]);
 }
 
-pub type WindowOpenResult<T> = Result<T, ()>;
+pub type WindowOpenResult<T> = Result<(T, Option<WindowInfo>), ()>;
 
 pub trait PluginUI: Plugin {
     type Handle;
-
-    fn ui_size() -> (i16, i16);
 
     fn ui_open(parent: RawWindowHandle) -> WindowOpenResult<Self::Handle>;
     fn ui_close(handle: Self::Handle);

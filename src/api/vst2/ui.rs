@@ -83,7 +83,14 @@ impl<P: PluginUI> VST2UI for VST2Adapter<P> {
     }
 
     fn ui_get_rect(&self) -> Option<(i16, i16)> {
-        Some(P::ui_size())
+        if let Some(window_info) = self.window_info {
+            Some((
+                window_info.physical_width() as i16,
+                window_info.physical_height() as i16,
+            ))
+        } else {
+            None
+        }
     }
 
     fn ui_open(&mut self, parent: *mut c_void) -> WindowOpenResult<()> {
@@ -91,9 +98,14 @@ impl<P: PluginUI> VST2UI for VST2Adapter<P> {
 
         if self.ui_handle.is_none() {
             P::ui_open(parent.into())
-                .map(|handle| self.ui_handle = Some(handle))
+                .map(|(handle, window_info)| {
+                    self.ui_handle = Some(handle);
+                    self.window_info = window_info;
+
+                    ((), self.window_info)
+                })
         } else {
-            Ok(())
+            Ok(((), self.window_info))
         }
     }
 

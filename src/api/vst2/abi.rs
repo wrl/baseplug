@@ -120,6 +120,7 @@ pub fn plugin_main<P: Plugin>(host_cb: HostCallbackProc, unique_id: &[u8; 4]) ->
         },
 
         ui_handle: None,
+        window_info: None,
 
         wrapped: WrappedPlugin::new(),
         state: None
