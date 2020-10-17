@@ -16,7 +16,7 @@
   - [ ] `ProcessEvent` - (Not sure what this does)
   - [ ] `GetData` - (Not sure what this does)
   - [ ] `SetData` - (Not sure what this does)
-  - [ ] `EditorGetRect` - Store initial plugin window size into `ptr` by first a VST extension, second from a user-supplied config-file, and third from guessing the DPI scaling of the system.
+  - [ ] `EditorGetRect` - Store initial plugin window size into `ptr`. The host may call this before opening the plugin editor window. Returning the correct size based on DPI scaling can be acheived by first a VST extension, second from a user-supplied config-file, and third from guessing the DPI scaling of the system.
   - [ ] `EditorOpen` - Open the editor window. (Is `ptr` a handle to the window?)
   - [ ] `EditorClose` - Close the editor window.
   - [ ] `UnhandledOpCode` - Print the unhandled opcode.
