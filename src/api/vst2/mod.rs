@@ -23,6 +23,9 @@ pub use abi::plugin_main;
 // vst-rs doesn't have this for some reason
 const MAX_EFFECT_NAME_LEN: usize = 32;
 
+// output events buffer size
+const OUTPUT_BUFFER_SIZE: usize = 256;
+
 #[inline]
 fn cstr_as_slice<'a>(ptr: *mut c_void, len: usize) -> &'a mut [u8] {
     unsafe { slice::from_raw_parts_mut(ptr as *mut u8, len) }
@@ -60,26 +63,23 @@ macro_rules! param_for_idx {
 pub struct OutgoingEvents {
     num_events: i32,
     _reserved: isize,
-    event_ptrs: [*mut Event; 256],
-    events: [Event; 256],
+    event_ptrs: [*mut Event; OUTPUT_BUFFER_SIZE],
+    events: [Event; OUTPUT_BUFFER_SIZE],
 }
 
 impl OutgoingEvents {
     pub fn new() -> Self {
         // create placeholders, ownership stays here
-        let mut blnk_evts = [Event {
+        let blnk_evts = [Event {
             event_type: EventType::Midi,
             byte_size: std::mem::size_of::<MidiEvent>() as i32,
             delta_frames: 0,
             _flags: 0,
             _reserved: [0; 16],
-        }; 256];
+        }; OUTPUT_BUFFER_SIZE];
 
-        // create ptrs, those are staying there
-        let mut evts_ptrs: [*mut Event; 256] = [ptr::null_mut(); 256];
-        for (evt, evt_ptr) in blnk_evts.iter_mut().zip(evts_ptrs.iter_mut()) {
-            *evt_ptr = evt as *mut _;
-        }
+        // init ptrs to null
+        let evts_ptrs: [*mut Event; OUTPUT_BUFFER_SIZE] = [ptr::null_mut(); OUTPUT_BUFFER_SIZE];
 
         OutgoingEvents {
             num_events: 0,
@@ -87,20 +87,6 @@ impl OutgoingEvents {
             events: blnk_evts,
             event_ptrs: evts_ptrs,
         }
-    }
-
-    pub fn clear(&mut self) {
-        // reset data
-        self.events = [Event {
-            event_type: EventType::Midi,
-            byte_size: std::mem::size_of::<MidiEvent>() as i32,
-            delta_frames: 0,
-            _flags: 0,
-            _reserved: [0; 16],
-        }; 256];
-
-        // reset count
-        self.num_events = 0;
     }
 }
 
@@ -299,21 +285,21 @@ impl<P: Plugin> VST2Adapter<P> {
                     CStr::from_ptr(ptr as *mut c_char).to_bytes()
                 })
                 .into_owned();
-                
+
                 let can_do = match can_do.as_str() {
                     "sendVstEvents" => Supported::Yes,
                     "sendVstMidiEvent" => Supported::Yes,
                     // "receiveVstEvents" => Supported::Maybe,
                     // "receiveVstMidiEvent" => Supported::Maybe,
-                    // "receiveVstTimeInfo" => ReceiveTimeInfo,
+                    "receiveVstTimeInfo" => Supported::Yes,
                     // "offline" => Offline,
                     // "midiProgramNames" => MidiProgramNames,
                     // "bypass" => Bypass,
-        
+
                     // "receiveVstSysexEvent" => ReceiveSysExEvent,
                     // "midiSingleNoteTuningChange" => MidiSingleNoteTuningChange,
                     // "midiKeyBasedInstrumentControl" => MidiKeyBasedInstrumentControl,
-                    otherwise => Supported::Maybe
+                    otherwise => Supported::Maybe,
                 };
 
                 return can_do.into();
@@ -425,6 +411,9 @@ impl<P: Plugin> VST2Adapter<P> {
 
     #[inline]
     fn send_output_events(&mut self) {
+        // init
+        self.output_events_buffer.num_events = 0;
+
         // write into output buffer
         for (bevt, ev) in self
             .wrapped
@@ -437,8 +426,8 @@ impl<P: Plugin> VST2Adapter<P> {
                     let midi_event: MidiEvent = MidiEvent {
                         event_type: EventType::Midi,
                         byte_size: mem::size_of::<MidiEvent>() as i32,
-                        delta_frames: 0,
-                        flags: 0,
+                        delta_frames: bevt.frame as i32,
+                        flags: MidiEventFlags::REALTIME_EVENT.bits(),
                         note_length: 0,
                         note_offset: 0,
                         midi_data: [midi_data[0], midi_data[1], midi_data[2]],
@@ -449,7 +438,6 @@ impl<P: Plugin> VST2Adapter<P> {
                         _reserved2: 0,
                     };
                     *ev = unsafe { std::mem::transmute(midi_event) };
-                    ev.event_type = EventType::Midi;
 
                     self.output_events_buffer.num_events += 1;
                 }
@@ -459,18 +447,27 @@ impl<P: Plugin> VST2Adapter<P> {
             }
         }
 
-        // send to host
-        let callback = self.host_cb;
-        callback(
-            &mut self.effect as *mut AEffect,
-            host::OpCode::ProcessEvents.into(),
-            0,
-            0,
-            &self.output_events_buffer as *const _ as *mut _,
-            0.0,
-        );
-
-        // clear
-        self.output_events_buffer.clear();
+        if self.output_events_buffer.num_events > 0 {
+            // update pointers
+            for (evt, evt_ptr) in self
+                .output_events_buffer
+                .events
+                .iter_mut()
+                .zip(self.output_events_buffer.event_ptrs.iter_mut())
+            {
+                *evt_ptr = evt as *mut Event;
+            }
+            
+            // send to host
+            let callback = self.host_cb;
+            let res = callback(
+                &mut self.effect as *mut AEffect,
+                host::OpCode::ProcessEvents.into(),
+                0,
+                0,
+                &self.output_events_buffer as *const _ as *mut _,
+                0.0,
+            );
+        }
     }
 }
