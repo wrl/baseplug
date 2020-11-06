@@ -122,7 +122,9 @@ pub fn plugin_main<P: Plugin>(host_cb: HostCallbackProc, unique_id: &[u8; 4]) ->
         ui_handle: None,
 
         wrapped: WrappedPlugin::new(),
-        state: None
+        state: None,
+
+        output_events_buffer: OutgoingEvents::new()
     });
 
     unsafe {

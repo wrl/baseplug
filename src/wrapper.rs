@@ -31,6 +31,7 @@ pub(crate) struct WrappedPlugin<P: Plugin> {
     // an enqueue_event() call to come *during* a process() call, and we need to be able to handle
     // that in the future. we may need to use a different data structure here.
     events: Vec<Event<P>>,
+    pub(crate) output_events: Vec<Event<P>>,
 
     pub(crate) smoothed_model: <P::Model as Model<P>>::Smooth,
     sample_rate: f32
@@ -42,6 +43,7 @@ impl<P: Plugin> WrappedPlugin<P> {
         Self {
             plug: P::new(48000.0, &P::Model::default()),
             events: Vec::with_capacity(512),
+            output_events: Vec::with_capacity(256),
             smoothed_model:
                 <P::Model as Model<P>>::Smooth::from_model(P::Model::default()),
             sample_rate: 0.0
@@ -125,22 +127,26 @@ impl<P: Plugin> WrappedPlugin<P> {
     // events
     ////
 
-    pub(crate) fn enqueue_event(&mut self, ev: Event<P>) {
-        let latest_frame = match self.events.last() {
+    fn enqueue_event_in(ev: Event<P>, buffer: &mut Vec<Event<P>>) {
+        let latest_frame = match buffer.last() {
             Some(ev) => ev.frame,
             None => 0
         };
 
         if latest_frame <= ev.frame {
-            self.events.push(ev);
+            buffer.push(ev);
             return;
         }
 
-        let idx = self.events.iter()
+        let idx = buffer.iter()
             .position(|e| e.frame > ev.frame)
             .unwrap();
 
-        self.events.insert(idx, ev);
+        buffer.insert(idx, ev);
+    }
+
+    pub(crate) fn enqueue_event(&mut self, ev: Event<P>) {
+        Self::enqueue_event_in(ev, &mut self.events);
     }
 
     ////
@@ -206,12 +212,18 @@ impl<P: Plugin> WrappedPlugin<P> {
                 }
             };
 
+            let output_events = &mut self.output_events;
+
             let mut context = ProcessContext {
                 nframes: block_frames,
                 sample_rate: self.sample_rate,
 
                 inputs: &[in_bus],
                 outputs: &mut [out_bus],
+
+                enqueue_event: &mut |ev| {
+                    Self::enqueue_event_in(ev, output_events);
+                },
 
                 // FIXME: should we advance the musical time when we do block subdivisions?
                 //        we have all of the data necessary to do so.

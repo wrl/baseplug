@@ -115,7 +115,7 @@ impl Plugin for MidiSine {
     }
 
     #[inline]
-    fn process(&mut self, model: &MidiSineModelProcess, ctx: &mut ProcessContext) {
+    fn process(&mut self, model: &MidiSineModelProcess, ctx: &mut ProcessContext<Self>) {
         let output = &mut ctx.outputs[0].buffers;
 
         for i in 0..ctx.nframes {

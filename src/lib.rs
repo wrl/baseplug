@@ -61,12 +61,14 @@ pub struct AudioBusMut<'a, 'b> {
     pub buffers: &'a mut [&'b mut [f32]]
 }
 
-pub struct ProcessContext<'a, 'b> {
+pub struct ProcessContext<'a, 'b, P: Plugin> {
     pub nframes: usize,
     pub sample_rate: f32,
 
     pub inputs: &'a [AudioBus<'a>],
     pub outputs: &'a mut [AudioBusMut<'a, 'b>],
+
+    pub enqueue_event: &'a mut dyn FnMut(Event<P>),
 
     pub musical_time: MusicalTime
 }
@@ -95,7 +97,7 @@ pub trait Plugin: Sized + Send + Sync + 'static {
 
     fn process<'proc>(&mut self,
         model: &proc_model!(Self, 'proc),
-        ctx: &'proc mut ProcessContext);
+        ctx: &'proc mut ProcessContext<Self>);
 }
 
 pub trait MidiReceiver: Plugin {
