@@ -340,6 +340,7 @@ impl<P: Plugin> VST2Adapter<P> {
         let mut mtime = MusicalTime {
             bpm: 0.0,
             beat: 0.0,
+            is_playing: false,
         };
 
         let time_info = {
@@ -368,6 +369,10 @@ impl<P: Plugin> VST2Adapter<P> {
 
         if flags.contains(TimeInfoFlags::PPQ_POS_VALID) {
             mtime.beat = time_info.ppq_pos;
+        }
+
+        if flags.contains(TimeInfoFlags::TRANSPORT_PLAYING) {
+            mtime.is_playing = true;
         }
 
         mtime
@@ -457,7 +462,7 @@ impl<P: Plugin> VST2Adapter<P> {
             {
                 *evt_ptr = evt as *mut Event;
             }
-            
+
             // send to host
             let callback = self.host_cb;
             let res = callback(

@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use baseplug::{Plugin, ProcessContext, Event, event::Data};
+use baseplug::{event::Data, Event, Plugin, ProcessContext};
 
 baseplug::model! {
     #[derive(Debug, Serialize, Deserialize)]
@@ -23,7 +23,8 @@ impl Default for MidiSenderModel {
 
 struct MidiSender {
     sample_rate: f32,
-    frame_count: u64,
+    note_on: bool,
+    on_ct: u64,
 }
 
 impl Plugin for MidiSender {
@@ -42,7 +43,8 @@ impl Plugin for MidiSender {
     fn new(sample_rate: f32, model: &Self::Model) -> Self {
         Self {
             sample_rate: sample_rate,
-            frame_count: 0,
+            note_on: false,
+            on_ct: 0,
         }
     }
 
@@ -59,36 +61,50 @@ impl Plugin for MidiSender {
             output[1][i] = 0.0;
 
             // get the current beat and tempo
-            // let curr_beat = ctx.musical_time.beat;
+            let curr_beat = ctx.musical_time.beat;
             let curr_bpm = ctx.musical_time.bpm;
+            let is_playing = ctx.musical_time.is_playing;
+
+            // calc
             let beat_in_ms = 60_000.0 / curr_bpm;
             let beat_in_samples = beat_in_ms * self.sample_rate as f64 / 1000.0;
+            let sixth_in_samples = beat_in_samples / 4.0;
+            let curr_beat_in_samples = beat_in_samples * curr_beat;
             let beat_in_samples = beat_in_samples.round() as u64;
+            let curr_beat_in_samples = curr_beat_in_samples.round() as u64;
+            let sixth_in_samples = sixth_in_samples.round() as u64;
 
             let enqueue_midi = &mut ctx.enqueue_event;
 
-            if self.frame_count % beat_in_samples == 0 {
+            let on_beat = curr_beat_in_samples % beat_in_samples == 0;
+            // let on_sixth = curr_beat_in_samples % sixth_in_samples == 0;
+
+            if on_beat && is_playing && !self.note_on {
                 // send a note on (C2)
                 let note_on = Event::<MidiSender> {
                     frame: i,
-                    data: Data::Midi([144, 36, 120])
+                    data: Data::Midi([144, 36, 120]),
                 };
 
                 enqueue_midi(note_on);
+                self.note_on = true;
+                self.on_ct = 0;
             }
 
-            if self.frame_count % (beat_in_samples + beat_in_samples / 16) == 0 {
+            if self.on_ct == sixth_in_samples {
                 // send a note off (C2)
                 let note_off = Event::<MidiSender> {
                     frame: i,
-                    data: Data::Midi([128, 36, 0])
+                    data: Data::Midi([128, 36, 0]),
                 };
 
                 enqueue_midi(note_off);
+                self.note_on = false;
             }
 
-            // inc absolute frame count
-            self.frame_count += 1;
+            if self.note_on {
+                self.on_ct += 1;
+            }
         }
     }
 }

@@ -48,7 +48,8 @@ const MAX_BLOCKSIZE: usize = 128;
 #[derive(Clone)]
 pub struct MusicalTime {
     pub bpm: f64,
-    pub beat: f64
+    pub beat: f64,
+    pub is_playing: bool
 }
 
 pub struct AudioBus<'a> {
