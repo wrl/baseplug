@@ -9,15 +9,15 @@ use baseplug::{event::Data, Event, Plugin, ProcessContext};
 baseplug::model! {
     #[derive(Debug, Serialize, Deserialize)]
     struct MidiSenderModel {
-        #[model(min = 1.0, max = 8.0)]
-        #[parameter(name = "speed")]
-        speed: f32,
+        #[model(min = 0.5, max = 2.0)]
+        #[parameter(name = "len")]
+        len: f32,
     }
 }
 
 impl Default for MidiSenderModel {
     fn default() -> Self {
-        Self { speed: 1.0 }
+        Self { len: 1.0 }
     }
 }
 
@@ -68,7 +68,7 @@ impl Plugin for MidiSender {
             // calc
             let beat_in_ms = 60_000.0 / curr_bpm;
             let beat_in_samples = beat_in_ms * self.sample_rate as f64 / 1000.0;
-            let sixth_in_samples = beat_in_samples / 4.0;
+            let sixth_in_samples = (beat_in_samples / 4.0) * model.len[i] as f64;
             let curr_beat_in_samples = beat_in_samples * curr_beat;
             let beat_in_samples = beat_in_samples.round() as u64;
             let curr_beat_in_samples = curr_beat_in_samples.round() as u64;
