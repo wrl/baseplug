@@ -25,6 +25,7 @@ struct MidiSender {
     sample_rate: f32,
     note_on: bool,
     on_ct: u64,
+    frame_ct: u64,
 }
 
 impl Plugin for MidiSender {
@@ -34,7 +35,7 @@ impl Plugin for MidiSender {
 
     const VENDOR: &'static str = "spicy plugins & co";
 
-    const INPUT_CHANNELS: usize = 0;
+    const INPUT_CHANNELS: usize = 2;
 
     const OUTPUT_CHANNELS: usize = 2;
 
@@ -45,6 +46,7 @@ impl Plugin for MidiSender {
             sample_rate: sample_rate,
             note_on: false,
             on_ct: 0,
+            frame_ct: 0,
         }
     }
 
@@ -54,32 +56,25 @@ impl Plugin for MidiSender {
         ctx: &'proc mut ProcessContext<Self>,
     ) {
         let output = &mut ctx.outputs[0].buffers;
+        let enqueue_midi = &mut ctx.enqueue_event;
+
+        // get the current beat and tempo
+        let curr_bpm = ctx.musical_time.bpm;
+        let is_playing = ctx.musical_time.is_playing;
 
         for i in 0..ctx.nframes {
             // write silence
             output[0][i] = 0.0;
             output[1][i] = 0.0;
 
-            // get the current beat and tempo
-            let curr_beat = ctx.musical_time.beat;
-            let curr_bpm = ctx.musical_time.bpm;
-            let is_playing = ctx.musical_time.is_playing;
-
             // calc
             let beat_in_ms = 60_000.0 / curr_bpm;
             let beat_in_samples = beat_in_ms * self.sample_rate as f64 / 1000.0;
             let sixth_in_samples = (beat_in_samples / 4.0) * model.len[i] as f64;
-            let curr_beat_in_samples = beat_in_samples * curr_beat;
             let beat_in_samples = beat_in_samples.round() as u64;
-            let curr_beat_in_samples = curr_beat_in_samples.round() as u64;
             let sixth_in_samples = sixth_in_samples.round() as u64;
 
-            let enqueue_midi = &mut ctx.enqueue_event;
-
-            let on_beat = curr_beat_in_samples % beat_in_samples == 0;
-            // let on_sixth = curr_beat_in_samples % sixth_in_samples == 0;
-
-            if on_beat && is_playing && !self.note_on {
+            if is_playing && self.frame_ct % beat_in_samples == 0 {
                 // send a note on (C2)
                 let note_on = Event::<MidiSender> {
                     frame: i,
@@ -91,7 +86,7 @@ impl Plugin for MidiSender {
                 self.on_ct = 0;
             }
 
-            if self.on_ct == sixth_in_samples {
+            if is_playing && self.note_on && self.on_ct == sixth_in_samples {
                 // send a note off (C2)
                 let note_off = Event::<MidiSender> {
                     frame: i,
@@ -102,8 +97,13 @@ impl Plugin for MidiSender {
                 self.note_on = false;
             }
 
-            if self.note_on {
-                self.on_ct += 1;
+            if is_playing {
+                if self.note_on {
+                    self.on_ct += 1;
+                }
+                self.frame_ct += 1;
+            } else {
+                self.frame_ct = 0;
             }
         }
     }

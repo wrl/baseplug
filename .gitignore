@@ -1,3 +1,4 @@
 /target
 /baseplug-derive/target
 Cargo.lock
+.vscode
