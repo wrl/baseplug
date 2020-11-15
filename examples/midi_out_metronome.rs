@@ -8,30 +8,30 @@ use baseplug::{event::Data, Event, Plugin, ProcessContext};
 
 baseplug::model! {
     #[derive(Debug, Serialize, Deserialize)]
-    struct MidiSenderModel {
+    struct MidiOutMetronomeModel {
         #[model(min = 0.5, max = 2.0)]
         #[parameter(name = "len")]
         len: f32,
     }
 }
 
-impl Default for MidiSenderModel {
+impl Default for MidiOutMetronomeModel {
     fn default() -> Self {
         Self { len: 1.0 }
     }
 }
 
-struct MidiSender {
+struct MidiOutMetronome {
     sample_rate: f32,
     note_on: bool,
     on_ct: u64,
     frame_ct: u64,
 }
 
-impl Plugin for MidiSender {
-    const NAME: &'static str = "midi sender plug";
+impl Plugin for MidiOutMetronome {
+    const NAME: &'static str = "midi out metronome plug";
 
-    const PRODUCT: &'static str = "midi sender plug";
+    const PRODUCT: &'static str = "midi out metronome plug";
 
     const VENDOR: &'static str = "spicy plugins & co";
 
@@ -39,7 +39,7 @@ impl Plugin for MidiSender {
 
     const OUTPUT_CHANNELS: usize = 2;
 
-    type Model = MidiSenderModel;
+    type Model = MidiOutMetronomeModel;
 
     fn new(sample_rate: f32, model: &Self::Model) -> Self {
         Self {
@@ -52,7 +52,7 @@ impl Plugin for MidiSender {
 
     fn process<'proc>(
         &mut self,
-        model: &MidiSenderModelProcess,
+        model: &MidiOutMetronomeModelProcess,
         ctx: &'proc mut ProcessContext<Self>,
     ) {
         let output = &mut ctx.outputs[0].buffers;
@@ -76,7 +76,7 @@ impl Plugin for MidiSender {
 
             if is_playing && self.frame_ct % beat_in_samples == 0 {
                 // send a note on (C2)
-                let note_on = Event::<MidiSender> {
+                let note_on = Event::<MidiOutMetronome> {
                     frame: i,
                     data: Data::Midi([144, 36, 120]),
                 };
@@ -88,7 +88,7 @@ impl Plugin for MidiSender {
 
             if is_playing && self.note_on && self.on_ct == sixth_in_samples {
                 // send a note off (C2)
-                let note_off = Event::<MidiSender> {
+                let note_off = Event::<MidiOutMetronome> {
                     frame: i,
                     data: Data::Midi([128, 36, 0]),
                 };
@@ -109,4 +109,4 @@ impl Plugin for MidiSender {
     }
 }
 
-baseplug::vst2!(MidiSender, b"~Ms~");
+baseplug::vst2!(MidiOutMetronome, b"~MM~");

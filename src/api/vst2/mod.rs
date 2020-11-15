@@ -28,7 +28,9 @@ const OUTPUT_BUFFER_SIZE: usize = 256;
 
 #[inline]
 fn cstr_as_slice<'a>(ptr: *mut c_void, len: usize) -> &'a mut [u8] {
-    unsafe { slice::from_raw_parts_mut(ptr as *mut u8, len) }
+    unsafe { 
+        slice::from_raw_parts_mut(ptr as *mut u8, len) 
+    }
 }
 
 fn cstrcpy(ptr: *mut c_void, src: &str, max_len: usize) {
@@ -42,9 +44,9 @@ fn cstrcpy(ptr: *mut c_void, src: &str, max_len: usize) {
 
 #[inline]
 fn param_for_vst2_id<P, M>(id: i32) -> Option<&'static Param<P, M::Smooth>>
-where
-    P: Plugin,
-    M: Model<P>,
+    where
+        P: Plugin,
+        M: Model<P>,
 {
     M::Smooth::PARAMS.get(id as usize).copied()
 }
@@ -55,7 +57,7 @@ macro_rules! param_for_idx {
             Some(p) => p,
             None => return 0,
         }
-    };
+    }
 }
 
 // represents an output buffer to send events to host
@@ -110,22 +112,18 @@ struct VST2Adapter<P: Plugin> {
 
 impl<P: Plugin> VST2Adapter<P> {
     #[inline]
-    fn dispatch(
-        &mut self,
-        opcode: i32,
-        index: i32,
-        value: isize,
-        ptr: *mut c_void,
-        opt: f32,
-    ) -> isize {
+    fn dispatch(&mut self, opcode: i32, index: i32, value: isize, ptr: *mut c_void, opt: f32) -> isize {
         match OpCode::from(opcode) {
             ////
             // lifecycle
             ////
+
             OpCode::GetApiVersion => return 2400,
             OpCode::Shutdown => {
-                unsafe { drop(Box::from_raw(self)) };
-            }
+                unsafe { 
+                    drop(Box::from_raw(self)) 
+                };
+            },
 
             OpCode::SetSampleRate => self.wrapped.set_sample_rate(opt),
 
@@ -133,7 +131,7 @@ impl<P: Plugin> VST2Adapter<P> {
                 if value == 1 {
                     self.wrapped.reset();
                 }
-            }
+            },
 
             ////
             // parameters
@@ -142,32 +140,33 @@ impl<P: Plugin> VST2Adapter<P> {
                 let param = param_for_idx!(index);
                 cstrcpy(ptr, param.get_name(), MAX_PARAM_STR_LEN);
                 return 0;
-            }
+            },
 
             OpCode::GetParameterLabel => {
                 let param = param_for_idx!(index);
                 cstrcpy(ptr, param.get_label(), MAX_PARAM_STR_LEN);
                 return 0;
-            }
+            },
 
             OpCode::GetParameterDisplay => {
                 let param = param_for_idx!(index);
                 let dest = cstr_as_slice(ptr, MAX_PARAM_STR_LEN);
-                let mut cursor = io::Cursor::new(&mut dest[..MAX_PARAM_STR_LEN - 1]);
+                let mut cursor = io::Cursor::new(
+                    &mut dest[..MAX_PARAM_STR_LEN - 1]);
 
                 match param.get_display(&self.wrapped.smoothed_model, &mut cursor) {
                     Ok(_) => {
                         let len = cursor.position();
                         dest[len as usize] = 0;
                         return len as isize;
-                    }
+                    },
 
                     Err(_) => {
                         dest[0] = 0;
                         return 0;
                     }
                 }
-            }
+            },
 
             OpCode::CanBeAutomated => return 1,
 
@@ -177,24 +176,24 @@ impl<P: Plugin> VST2Adapter<P> {
             OpCode::GetEffectName => {
                 cstrcpy(ptr, P::NAME, MAX_EFFECT_NAME_LEN);
                 return 1;
-            }
+            },
 
             OpCode::GetProductName => {
                 cstrcpy(ptr, P::PRODUCT, MAX_PRODUCT_STR_LEN);
                 return 1;
-            }
+            },
 
             OpCode::GetVendorName => {
                 cstrcpy(ptr, P::VENDOR, MAX_VENDOR_STR_LEN);
                 return 1;
-            }
+            },
 
             ////
             // events
             ////
             OpCode::GetCurrentPresetName => {
                 return 0;
-            }
+            },
 
             ////
             // events
@@ -202,13 +201,19 @@ impl<P: Plugin> VST2Adapter<P> {
             OpCode::ProcessEvents => unsafe {
                 let vst_events = &*(ptr as *const Events);
                 let ev_slice =
-                    slice::from_raw_parts(&vst_events.events[0], vst_events.num_events as usize);
+                    slice::from_raw_parts(
+                        &vst_events.events[0], 
+                        
+                        vst_events.num_events as usize
+                    );
 
                 for ev in ev_slice {
                     if let EventType::Midi = (**ev).event_type {
                         let ev = *ev as *const vst::api::MidiEvent;
-                        self.wrapped
-                            .midi_input((*ev).delta_frames as usize, (*ev).midi_data);
+                        self.wrapped.midi_input(
+                            (*ev).delta_frames as usize, 
+                            (*ev).midi_data
+                        );
                     }
                 }
 
@@ -221,28 +226,32 @@ impl<P: Plugin> VST2Adapter<P> {
             OpCode::GetData => {
                 let new_state = match self.wrapped.serialise() {
                     None => return 0,
-                    Some(s) => s,
+                    Some(s) => s
                 };
 
                 unsafe {
-                    *(ptr as *mut *const c_void) = new_state.as_ptr() as *const c_void;
+                    *(ptr as *mut *const c_void) = 
+                        new_state.as_ptr() as *const c_void;
                 }
 
                 let len = new_state.len() as isize;
                 self.state = Some(new_state);
                 return len;
-            }
+            },
 
             OpCode::SetData => {
-                let state = unsafe { slice::from_raw_parts(ptr as *mut u8, value as usize) };
+                let state = unsafe { 
+                    slice::from_raw_parts(ptr as *mut u8, value as usize) 
+                };
 
                 self.wrapped.deserialise(state);
                 return 0;
-            }
+            },
 
             ////
             // editor
             ////
+
             OpCode::EditorGetRect => {
                 let ptr = ptr as *mut *mut c_void;
 
@@ -251,7 +260,7 @@ impl<P: Plugin> VST2Adapter<P> {
                     None => unsafe {
                         *ptr = ptr::null_mut();
                         return 0;
-                    },
+                    }
                 };
 
                 self.editor_rect = Rect {
@@ -266,18 +275,18 @@ impl<P: Plugin> VST2Adapter<P> {
                     *ptr = (&self.editor_rect as *const _) as *mut c_void;
                     return 1;
                 }
-            }
+            },
 
             OpCode::EditorOpen => {
                 return match self.ui_open(ptr) {
                     Ok(_) => 1,
                     Err(_) => 0,
                 };
-            }
+            },
 
             OpCode::EditorClose => {
                 self.ui_close();
-            }
+            },
 
             OpCode::CanDo => {
                 // get the property
@@ -289,28 +298,20 @@ impl<P: Plugin> VST2Adapter<P> {
                 let can_do = match can_do.as_str() {
                     "sendVstEvents" => Supported::Yes,
                     "sendVstMidiEvent" => Supported::Yes,
-                    // "receiveVstEvents" => Supported::Maybe,
-                    // "receiveVstMidiEvent" => Supported::Maybe,
                     "receiveVstTimeInfo" => Supported::Yes,
-                    // "offline" => Offline,
-                    // "midiProgramNames" => MidiProgramNames,
-                    // "bypass" => Bypass,
-
-                    // "receiveVstSysexEvent" => ReceiveSysExEvent,
-                    // "midiSingleNoteTuningChange" => MidiSingleNoteTuningChange,
-                    // "midiKeyBasedInstrumentControl" => MidiKeyBasedInstrumentControl,
-                    otherwise => Supported::Maybe,
+                    _otherwise => Supported::Maybe,
                 };
 
                 return can_do.into();
-            }
+            },
 
             ////
             // ~who knows~
             ////
+
             o => {
                 eprintln!("unhandled opcode {:?}", o);
-            }
+            },
         }
 
         0
@@ -320,7 +321,7 @@ impl<P: Plugin> VST2Adapter<P> {
     fn get_parameter(&self, index: i32) -> f32 {
         let param = match param_for_vst2_id::<P, P::Model>(index) {
             Some(p) => p,
-            None => return 0.0,
+            None => return 0.0
         };
 
         self.wrapped.get_parameter(param)
@@ -330,7 +331,7 @@ impl<P: Plugin> VST2Adapter<P> {
     fn set_parameter(&mut self, index: i32, val: f32) {
         let param = match param_for_vst2_id::<P, P::Model>(index) {
             Some(p) => p,
-            None => return,
+            None => return
         };
 
         self.wrapped.set_parameter(param, val);
@@ -340,24 +341,21 @@ impl<P: Plugin> VST2Adapter<P> {
         let mut mtime = MusicalTime {
             bpm: 0.0,
             beat: 0.0,
-            is_playing: false,
+            is_playing: false
         };
 
         let time_info = {
             let flags = TimeInfoFlags::TEMPO_VALID | TimeInfoFlags::PPQ_POS_VALID;
 
-            let vti = (self.host_cb)(
-                &mut self.effect,
-                host::OpCode::GetTime as i32,
-                0,
+            let vti = (self.host_cb)(&mut self.effect,
+                host::OpCode::GetTime as i32, 0,
+                
                 flags.bits() as isize,
-                ptr::null_mut(),
-                0.0,
-            );
+                ptr::null_mut(), 0.0);
 
             match vti {
                 0 => return mtime,
-                ptr => unsafe { *(ptr as *const TimeInfo) },
+                ptr => unsafe { *(ptr as *const TimeInfo) }
             }
         };
 
@@ -379,33 +377,30 @@ impl<P: Plugin> VST2Adapter<P> {
     }
 
     #[inline]
-    fn process_replacing(
-        &mut self,
+    fn process_replacing(&mut self,
+
         in_buffers: *const *const f32,
         out_buffers: *mut *mut f32,
-        nframes: i32,
-    ) {
+        nframes: i32) 
+    {
         let input = unsafe {
             let b = slice::from_raw_parts(in_buffers, 2);
 
-            [
-                slice::from_raw_parts(b[0], nframes as usize),
-                slice::from_raw_parts(b[1], nframes as usize),
-            ]
+            [slice::from_raw_parts(b[0], nframes as usize),
+             slice::from_raw_parts(b[1], nframes as usize)]
+
         };
 
         let output = unsafe {
             let b = slice::from_raw_parts(out_buffers, 2);
 
-            [
-                slice::from_raw_parts_mut(b[0], nframes as usize),
-                slice::from_raw_parts_mut(b[1], nframes as usize),
-            ]
+            [slice::from_raw_parts_mut(b[0], nframes as usize),
+             slice::from_raw_parts_mut(b[1], nframes as usize)]
+
         };
 
         let musical_time = self.get_musical_time();
-        self.wrapped
-            .process(musical_time, input, output, nframes as usize);
+        self.wrapped.process(musical_time, input, output, nframes as usize);
 
         // write output_events in the buffer
         self.send_output_events();
