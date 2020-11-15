@@ -135,21 +135,20 @@ pub fn plugin_main<P: Plugin>(host_cb: HostCallbackProc, unique_id: &[u8; 4]) ->
 #[macro_export]
 macro_rules! vst2 {
     ($plugin:ty, $unique_id:expr) => {
+        use std::os::raw::c_void;
+        use std::mem::transmute;
+
         #[allow(non_snake_case)]
         #[no_mangle]
-        pub extern "C" fn main(host_callback: ::vst::api::HostCallbackProc)
-            -> *mut ::vst::api::AEffect
-        {
+        pub unsafe extern "C" fn main(host_callback: fn()) -> *mut c_void {
             VSTPluginMain(host_callback)
         }
 
         #[allow(non_snake_case)]
         #[no_mangle]
-        pub extern "C" fn VSTPluginMain(host_callback: ::vst::api::HostCallbackProc)
-            -> *mut ::vst::api::AEffect
-        {
+        pub unsafe extern "C" fn VSTPluginMain(host_callback: fn()) -> *mut c_void {
             $crate::api::vst2::plugin_main::<$plugin>(
-                host_callback, $unique_id)
+                transmute(host_callback), $unique_id) as *mut _
         }
     }
 }
