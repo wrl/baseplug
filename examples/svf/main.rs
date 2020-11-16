@@ -57,7 +57,7 @@ impl Plugin for SVFPlugin {
     }
 
     #[inline]
-    fn process(&mut self, model: &SVFModelProcess, ctx: &mut ProcessContext) {
+    fn process(&mut self, model: &SVFModelProcess, ctx: &mut ProcessContext<Self>) {
         let input = &ctx.inputs[0].buffers;
         let output = &mut ctx.outputs[0].buffers;
 

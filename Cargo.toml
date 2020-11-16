@@ -32,3 +32,7 @@ crate-type = ["cdylib"]
 [[example]]
 name = "midi_sine"
 crate-type = ["cdylib"]
+
+[[example]]
+name = "midi_out_metronome"
+crate-type = ["cdylib"]
