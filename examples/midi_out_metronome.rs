@@ -22,7 +22,6 @@ impl Default for MidiOutMetronomeModel {
 }
 
 struct MidiOutMetronome {
-    sample_rate: f32,
     note_on: bool,
     on_ct: u64,
     frame_ct: u64,
@@ -30,31 +29,25 @@ struct MidiOutMetronome {
 
 impl Plugin for MidiOutMetronome {
     const NAME: &'static str = "midi out metronome plug";
-
     const PRODUCT: &'static str = "midi out metronome plug";
-
     const VENDOR: &'static str = "spicy plugins & co";
 
     const INPUT_CHANNELS: usize = 2;
-
     const OUTPUT_CHANNELS: usize = 2;
 
     type Model = MidiOutMetronomeModel;
 
-    fn new(sample_rate: f32, model: &Self::Model) -> Self {
+    fn new(_sample_rate: f32, _model: &Self::Model) -> Self {
         Self {
-            sample_rate: sample_rate,
             note_on: false,
             on_ct: 0,
             frame_ct: 0,
         }
     }
 
-    fn process<'proc>(
-        &mut self,
-        model: &MidiOutMetronomeModelProcess,
-        ctx: &'proc mut ProcessContext<Self>,
-    ) {
+    fn process<'proc>(&mut self, model: &MidiOutMetronomeModelProcess,
+        ctx: &'proc mut ProcessContext<Self>)
+    {
         let output = &mut ctx.outputs[0].buffers;
         let enqueue_midi = &mut ctx.enqueue_event;
 
@@ -69,7 +62,7 @@ impl Plugin for MidiOutMetronome {
 
             // calc
             let beat_in_ms = 60_000.0 / curr_bpm;
-            let beat_in_samples = beat_in_ms * self.sample_rate as f64 / 1000.0;
+            let beat_in_samples = beat_in_ms * ctx.sample_rate as f64 / 1000.0;
             let sixth_in_samples = (beat_in_samples / 4.0) * model.len[i] as f64;
             let beat_in_samples = beat_in_samples.round() as u64;
             let sixth_in_samples = sixth_in_samples.round() as u64;

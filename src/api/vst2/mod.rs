@@ -200,8 +200,8 @@ impl<P: Plugin> VST2Adapter<P> {
             OpCode::ProcessEvents => unsafe {
                 let vst_events = &*(ptr as *const Events);
                 let ev_slice = slice::from_raw_parts(
-                        &vst_events.events[0], 
-                        vst_events.num_events as usize
+                    &vst_events.events[0],
+                    vst_events.num_events as usize
                 );
 
                 for ev in ev_slice {
@@ -403,7 +403,6 @@ impl<P: Plugin> VST2Adapter<P> {
 
     #[inline]
     fn send_output_events(&mut self) {
-        // init
         self.output_events_buffer.num_events = 0;
 
         // write into output buffer
@@ -433,9 +432,8 @@ impl<P: Plugin> VST2Adapter<P> {
 
                     self.output_events_buffer.num_events += 1;
                 }
-                event::Data::Parameter { param, val } => {
-                    // not yet supported
-                }
+
+                _ => {}
             }
         }
 
@@ -451,15 +449,9 @@ impl<P: Plugin> VST2Adapter<P> {
             }
 
             // send to host
-            let callback = self.host_cb;
-            let res = callback(
-                &mut self.effect as *mut AEffect,
+            (self.host_cb)(&mut self.effect as *mut AEffect,
                 host::OpCode::ProcessEvents.into(),
-                0,
-                0,
-                &self.output_events_buffer as *const _ as *mut _,
-                0.0,
-            );
+                0, 0, &self.output_events_buffer as *const _ as *mut _, 0.0);
         }
     }
 }

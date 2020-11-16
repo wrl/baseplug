@@ -145,6 +145,7 @@ impl<P: Plugin> WrappedPlugin<P> {
         buffer.insert(idx, ev);
     }
 
+    #[inline]
     pub(crate) fn enqueue_event(&mut self, ev: Event<P>) {
         Self::enqueue_event_in(ev, &mut self.events);
     }
@@ -212,26 +213,32 @@ impl<P: Plugin> WrappedPlugin<P> {
                 }
             };
 
-            let output_events = &mut self.output_events;
+            // this scope is here so that we drop ProcessContext right after we're done with it.
+            // since `enqueue_event()` holds a reference to `start`, we need to have that reference
+            // released when we update `start` at the bottom of the loop iteration.
+            {
+                let output_events = &mut self.output_events;
 
-            let mut context = ProcessContext {
-                nframes: block_frames,
-                sample_rate: self.sample_rate,
+                let mut context = ProcessContext {
+                    nframes: block_frames,
+                    sample_rate: self.sample_rate,
 
-                inputs: &[in_bus],
-                outputs: &mut [out_bus],
+                    inputs: &[in_bus],
+                    outputs: &mut [out_bus],
 
-                enqueue_event: &mut |ev| {
-                    Self::enqueue_event_in(ev, output_events);
-                },
+                    enqueue_event: &mut |mut ev| {
+                        ev.frame += start;
+                        Self::enqueue_event_in(ev, output_events);
+                    },
 
-                // FIXME: should we advance the musical time when we do block subdivisions?
-                //        we have all of the data necessary to do so.
-                musical_time: musical_time.clone()
-            };
+                    // FIXME: should we advance the musical time when we do block subdivisions?
+                    //        we have all of the data necessary to do so.
+                    musical_time: musical_time.clone()
+                };
 
-            let proc_model = self.smoothed_model.process(block_frames);
-            self.plug.process(&proc_model, &mut context);
+                let proc_model = self.smoothed_model.process(block_frames);
+                self.plug.process(&proc_model, &mut context);
+            }
 
             nframes -= block_frames;
             start += block_frames;
