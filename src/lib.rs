@@ -115,4 +115,7 @@ pub trait PluginUI: Plugin {
 
     fn ui_open(parent: RawWindowHandle) -> WindowOpenResult<Self::Handle>;
     fn ui_close(handle: Self::Handle);
+
+    fn ui_param_notify(handle: &Self::Handle,
+        param: &'static Param<Self, <Self::Model as Model<Self>>::Smooth>, val: f32);
 }

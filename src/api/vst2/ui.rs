@@ -48,8 +48,6 @@ impl From<VST2WindowHandle> for RawWindowHandle {
 }
 
 pub(super) trait VST2UI {
-    type UIHandle;
-
     fn has_ui() -> bool;
 
     fn ui_get_rect(&self) -> Option<(i16, i16)>;
@@ -58,8 +56,6 @@ pub(super) trait VST2UI {
 }
 
 impl<P: Plugin> VST2UI for VST2Adapter<P> {
-    default type UIHandle = ();
-
     default fn has_ui() -> bool {
         false
     }
@@ -76,8 +72,6 @@ impl<P: Plugin> VST2UI for VST2Adapter<P> {
 }
 
 impl<P: PluginUI> VST2UI for VST2Adapter<P> {
-    type UIHandle = P::Handle;
-
     fn has_ui() -> bool {
         true
     }
@@ -89,16 +83,16 @@ impl<P: PluginUI> VST2UI for VST2Adapter<P> {
     fn ui_open(&mut self, parent: *mut c_void) -> WindowOpenResult<()> {
         let parent = VST2WindowHandle(parent);
 
-        if self.ui_handle.is_none() {
+        if self.wrapped.ui_handle.is_none() {
             P::ui_open(parent.into())
-                .map(|handle| self.ui_handle = Some(handle))
+                .map(|handle| self.wrapped.ui_handle = Some(handle))
         } else {
             Ok(())
         }
     }
 
     fn ui_close(&mut self) {
-        if let Some(handle) = self.ui_handle.take() {
+        if let Some(handle) = self.wrapped.ui_handle.take() {
             P::ui_close(handle)
         }
     }

@@ -3,6 +3,7 @@ use crate::{
     SmoothModel,
 
     Plugin,
+    PluginUI,
     MidiReceiver,
     Param,
 
@@ -34,7 +35,9 @@ pub(crate) struct WrappedPlugin<P: Plugin> {
     pub(crate) output_events: Vec<Event<P>>,
 
     pub(crate) smoothed_model: <P::Model as Model<P>>::Smooth,
-    sample_rate: f32
+    sample_rate: f32,
+
+    pub(crate) ui_handle: Option<<Self as WrappedPluginUI<P>>::UIHandle>
 }
 
 impl<P: Plugin> WrappedPlugin<P> {
@@ -46,7 +49,9 @@ impl<P: Plugin> WrappedPlugin<P> {
             output_events: Vec::with_capacity(256),
             smoothed_model:
                 <P::Model as Model<P>>::Smooth::from_model(P::Model::default()),
-            sample_rate: 0.0
+            sample_rate: 0.0,
+
+            ui_handle: None
         }
     }
 
@@ -91,6 +96,8 @@ impl<P: Plugin> WrappedPlugin<P> {
         } else {
             param.set(&mut self.smoothed_model, val);
         }
+
+        self.ui_param_notify(param, val);
     }
 
     fn set_parameter_from_event(&mut self, param: &Param<P, <P::Model as Model<P>>::Smooth>, val: f32) {
@@ -248,6 +255,10 @@ impl<P: Plugin> WrappedPlugin<P> {
     }
 }
 
+/////
+// midi input
+/////
+
 pub(crate) trait WrappedPluginMidiInput {
     fn wants_midi_input() -> bool;
 
@@ -284,5 +295,39 @@ impl<T: MidiReceiver> WrappedPluginMidiInput for WrappedPlugin<T> {
     fn dispatch_midi_event(&mut self, data: [u8; 3]) {
         let model = self.smoothed_model.current_value();
         self.plug.midi_input(&model, data)
+    }
+}
+
+/////
+// UI
+/////
+
+pub(crate) trait WrappedPluginUI<P: Plugin> {
+    type UIHandle;
+
+    fn ui_param_notify(&self,
+        param: &'static Param<P, <P::Model as Model<P>>::Smooth>, val: f32);
+}
+
+impl<P: Plugin> WrappedPluginUI<P> for WrappedPlugin<P> {
+    default type UIHandle = ();
+
+    #[inline]
+    default fn ui_param_notify(&self,
+        _param: &'static Param<P, <P::Model as Model<P>>::Smooth>, _val: f32)
+    {
+    }
+}
+
+impl<P: PluginUI> WrappedPluginUI<P> for WrappedPlugin<P> {
+    type UIHandle = P::Handle;
+
+    #[inline]
+    fn ui_param_notify(&self,
+        param: &'static Param<P, <P::Model as Model<P>>::Smooth>, val: f32)
+    {
+        if let Some(ui_handle) = self.ui_handle.as_ref() {
+            P::ui_param_notify(ui_handle, param, val);
+        }
     }
 }
