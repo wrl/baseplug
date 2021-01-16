@@ -31,7 +31,7 @@ pub struct ProcessContext<'a, 'b, P: Plugin> {
 
     pub enqueue_event: &'a mut dyn FnMut(Event<P>),
 
-    pub musical_time: MusicalTime
+    pub musical_time: &'a MusicalTime
 }
 
 pub trait Parameters<P: Plugin, Model: 'static> {

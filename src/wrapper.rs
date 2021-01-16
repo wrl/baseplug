@@ -238,7 +238,7 @@ impl<P: Plugin> WrappedPlugin<P> {
                         Self::enqueue_event_in(ev, output_events);
                     },
 
-                    musical_time: musical_time.clone()
+                    musical_time: &musical_time
                 };
 
                 let proc_model = self.smoothed_model.process(block_frames);
