@@ -176,7 +176,7 @@ impl<P: Plugin> WrappedPlugin<P> {
     }
 
     #[inline]
-    pub(crate) fn process(&mut self, musical_time: MusicalTime,
+    pub(crate) fn process(&mut self, mut musical_time: MusicalTime,
         input: [&[f32]; 2], mut output: [&mut [f32]; 2],
         mut nframes: usize)
     {
@@ -238,8 +238,6 @@ impl<P: Plugin> WrappedPlugin<P> {
                         Self::enqueue_event_in(ev, output_events);
                     },
 
-                    // FIXME: should we advance the musical time when we do block subdivisions?
-                    //        we have all of the data necessary to do so.
                     musical_time: musical_time.clone()
                 };
 
@@ -249,6 +247,8 @@ impl<P: Plugin> WrappedPlugin<P> {
 
             nframes -= block_frames;
             start += block_frames;
+
+            musical_time.step_by_samples(self.sample_rate.into(), block_frames);
         }
 
         self.events.clear();
