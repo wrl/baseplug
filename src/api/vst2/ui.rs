@@ -5,55 +5,49 @@ use raw_window_handle::{RawWindowHandle, HasRawWindowHandle};
 
 use super::*;
 
-struct VST2WindowHandle(RawWindowHandle);
+struct VST2WindowHandle(*mut c_void);
 
-impl VST2WindowHandle {
-    pub(crate) fn new(raw: *mut c_void) -> Self {
-        let handle = {
-            #[cfg(any(
-                target_os = "linux",
-                target_os = "dragonfly",
-                target_os = "freebsd",
-                target_os = "netbsd",
-                target_os = "openbsd"
-            ))]
-            {
-                use raw_window_handle::unix::*;
+impl From<&VST2WindowHandle> for RawWindowHandle {
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd"
+    ))]
+    fn from(handle: &VST2WindowHandle) -> RawWindowHandle {
+        use raw_window_handle::unix::*;
 
-                RawWindowHandle::Xcb(XcbHandle {
-                    window: raw as u32,
-                    ..XcbHandle::empty()
-                })
-            }
+        RawWindowHandle::Xcb(XcbHandle {
+            window: handle.0 as u32,
+            ..XcbHandle::empty()
+        })
+    }
 
-            #[cfg(target_os = "windows")]
-            {
-                use raw_window_handle::windows::*;
+    #[cfg(target_os = "windows")]
+    fn from(handle: &VST2WindowHandle) -> RawWindowHandle {
+        use raw_window_handle::windows::*;
 
-                RawWindowHandle::Windows(WindowsHandle {
-                    hwnd: raw,
-                    ..WindowsHandle::empty()
-                })
-            }
+        RawWindowHandle::Windows(WindowsHandle {
+            hwnd: handle.0,
+            ..WindowsHandle::empty()
+        })
+    }
 
-            #[cfg(target_os = "macos")]
-            {
-                use raw_window_handle::macos::*;
+    #[cfg(target_os = "macos")]
+    fn from(handle: &VST2WindowHandle) -> RawWindowHandle {
+        use raw_window_handle::macos::*;
 
-                RawWindowHandle::MacOS(MacOSHandle {
-                    ns_view: raw,
-                    ..MacOSHandle::empty()
-                })
-            }
-        };
-
-        Self(handle)
+        RawWindowHandle::MacOS(MacOSHandle {
+            ns_view: handle.0,
+            ..MacOSHandle::empty()
+        })
     }
 }
 
 unsafe impl HasRawWindowHandle for VST2WindowHandle {
     fn raw_window_handle(&self) -> RawWindowHandle {
-        self.0
+        self.into()
     }
 }
 
@@ -91,7 +85,7 @@ impl<P: PluginUI> VST2UI for VST2Adapter<P> {
     }
 
     fn ui_open(&mut self, parent: *mut c_void) -> WindowOpenResult<()> {
-        let parent = VST2WindowHandle::new(parent);
+        let parent = VST2WindowHandle(parent);
 
         if self.wrapped.ui_handle.is_none() {
             P::ui_open(&parent)
