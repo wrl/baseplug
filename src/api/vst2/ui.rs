@@ -1,14 +1,13 @@
 use std::os::raw::c_void;
 
-use raw_window_handle::RawWindowHandle;
+use raw_window_handle::{RawWindowHandle, HasRawWindowHandle};
 
 
 use super::*;
 
-
 struct VST2WindowHandle(*mut c_void);
 
-impl From<VST2WindowHandle> for RawWindowHandle {
+impl From<&VST2WindowHandle> for RawWindowHandle {
     #[cfg(any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -16,7 +15,7 @@ impl From<VST2WindowHandle> for RawWindowHandle {
         target_os = "netbsd",
         target_os = "openbsd"
     ))]
-    fn from(handle: VST2WindowHandle) -> RawWindowHandle {
+    fn from(handle: &VST2WindowHandle) -> RawWindowHandle {
         use raw_window_handle::unix::*;
 
         RawWindowHandle::Xcb(XcbHandle {
@@ -26,7 +25,7 @@ impl From<VST2WindowHandle> for RawWindowHandle {
     }
 
     #[cfg(target_os = "windows")]
-    fn from(handle: VST2WindowHandle) -> RawWindowHandle {
+    fn from(handle: &VST2WindowHandle) -> RawWindowHandle {
         use raw_window_handle::windows::*;
 
         RawWindowHandle::Windows(WindowsHandle {
@@ -36,13 +35,19 @@ impl From<VST2WindowHandle> for RawWindowHandle {
     }
 
     #[cfg(target_os = "macos")]
-    fn from(handle: VST2WindowHandle) -> RawWindowHandle {
+    fn from(handle: &VST2WindowHandle) -> RawWindowHandle {
         use raw_window_handle::macos::*;
 
         RawWindowHandle::MacOS(MacOSHandle {
             ns_view: handle.0,
             ..MacOSHandle::empty()
         })
+    }
+}
+
+unsafe impl HasRawWindowHandle for VST2WindowHandle {
+    fn raw_window_handle(&self) -> RawWindowHandle {
+        self.into()
     }
 }
 
@@ -83,7 +88,7 @@ impl<P: PluginUI> VST2UI for VST2Adapter<P> {
         let parent = VST2WindowHandle(parent);
 
         if self.wrapped.ui_handle.is_none() {
-            P::ui_open(parent.into())
+            P::ui_open(&parent)
                 .map(|handle| self.wrapped.ui_handle = Some(handle))
         } else {
             Ok(())
