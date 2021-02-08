@@ -3,7 +3,7 @@ use serde::{
     de::DeserializeOwned
 };
 
-use raw_window_handle::RawWindowHandle;
+use raw_window_handle::HasRawWindowHandle;
 
 
 use crate::parameter::*;
@@ -73,7 +73,7 @@ pub trait PluginUI: Plugin {
 
     fn ui_size() -> (i16, i16);
 
-    fn ui_open(parent: RawWindowHandle) -> WindowOpenResult<Self::Handle>;
+    fn ui_open(parent: &impl HasRawWindowHandle) -> WindowOpenResult<Self::Handle>;
     fn ui_close(handle: Self::Handle);
 
     fn ui_param_notify(handle: &Self::Handle,

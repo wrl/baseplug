@@ -1,6 +1,6 @@
 use std::os::raw::c_void;
 
-use raw_window_handle::RawWindowHandle;
+use raw_window_handle::{RawWindowHandle, HasRawWindowHandle};
 
 
 use super::*;
@@ -82,8 +82,15 @@ impl<P: PluginUI> VST2UI for VST2Adapter<P> {
     fn ui_open(&mut self, parent: *mut c_void) -> WindowOpenResult<()> {
         let parent = VST2WindowHandle(parent);
 
+        struct TrustedWindowHandle(pub RawWindowHandle);
+        unsafe impl HasRawWindowHandle for TrustedWindowHandle {
+            fn raw_window_handle(&self) -> RawWindowHandle {
+                self.0
+            }
+        }
+
         if self.wrapped.ui_handle.is_none() {
-            P::ui_open(parent.into())
+            P::ui_open(&TrustedWindowHandle(parent.into()))
                 .map(|handle| self.wrapped.ui_handle = Some(handle))
         } else {
             Ok(())
