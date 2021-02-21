@@ -278,6 +278,8 @@ impl<P: Plugin> VST2Adapter<P> {
                 };
             },
 
+            OpCode::EditorIdle => {},
+
             OpCode::EditorClose => {
                 self.ui_close();
             },
