@@ -4,12 +4,8 @@ use std::ptr;
 use std::{io, os::raw::c_char};
 use std::{mem, slice};
 
-use vst::api::consts::*;
-use vst::api::Event;
-use vst::api::*;
-use vst::editor::Rect;
-use vst::host;
-use vst::plugin::OpCode;
+pub use vst2_sys;
+use vst2_sys::*;
 
 use crate::wrapper::*;
 use crate::*;
@@ -20,8 +16,12 @@ use ui::*;
 mod abi;
 pub use abi::plugin_main;
 
-// vst-rs doesn't have this for some reason
+const MAX_PARAM_STR_LEN: usize = 32;
 const MAX_EFFECT_NAME_LEN: usize = 32;
+const MAX_VENDOR_STR_LEN: usize = 64;
+const MAX_PRODUCT_STR_LEN: usize = 64;
+
+const TRANSPORT_PLAYING: i32 = 2;
 
 // output events buffer size
 const OUTPUT_BUFFER_SIZE: usize = 256;
@@ -60,28 +60,36 @@ macro_rules! param_for_idx {
     }
 }
 
+#[repr(C)]
+struct Rect {
+    pub top: i16,
+    pub left: i16,
+    pub bottom: i16,
+    pub right: i16,
+}
+
 // represents an output buffer to send events to host
 #[repr(C)]
 pub struct OutgoingEvents {
     num_events: i32,
     _reserved: isize,
-    event_ptrs: [*mut Event; OUTPUT_BUFFER_SIZE],
-    events: [Event; OUTPUT_BUFFER_SIZE],
+    event_ptrs: [*mut MidiEvent; OUTPUT_BUFFER_SIZE],
+    events: [MidiEvent; OUTPUT_BUFFER_SIZE],
 }
 
 impl OutgoingEvents {
     pub fn new() -> Self {
         // create placeholders, ownership stays here
-        let blnk_evts = [Event {
-            event_type: EventType::Midi,
+        let blnk_evts = [vst2_sys::MidiEvent {
+            event_type: MIDI_TYPE,
             byte_size: std::mem::size_of::<MidiEvent>() as i32,
             delta_frames: 0,
-            _flags: 0,
-            _reserved: [0; 16],
+            flags: 0,
+            ..unsafe { std::mem::zeroed() }
         }; OUTPUT_BUFFER_SIZE];
 
         // init ptrs to null
-        let evts_ptrs: [*mut Event; OUTPUT_BUFFER_SIZE] = [ptr::null_mut(); OUTPUT_BUFFER_SIZE];
+        let evts_ptrs: [*mut MidiEvent; OUTPUT_BUFFER_SIZE] = [ptr::null_mut(); OUTPUT_BUFFER_SIZE];
 
         OutgoingEvents {
             num_events: 0,
@@ -115,20 +123,19 @@ struct VST2Adapter<P: Plugin> {
 impl<P: Plugin> VST2Adapter<P> {
     #[inline]
     fn dispatch(&mut self, opcode: i32, index: i32, value: isize, ptr: *mut c_void, opt: f32) -> isize {
-        match OpCode::from(opcode) {
+        match opcode {
             ////
             // lifecycle
             ////
-            OpCode::GetApiVersion => return 2400,
-            OpCode::Shutdown => {
+            effect_opcodes::CLOSE => {
                 unsafe {
                     drop(Box::from_raw(self))
                 };
             },
 
-            OpCode::SetSampleRate => self.wrapped.set_sample_rate(opt),
+            effect_opcodes::SET_SAMPLE_RATE => self.wrapped.set_sample_rate(opt),
 
-            OpCode::StateChanged => {
+            effect_opcodes::MAINS_CHANGED => {
                 if value == 1 {
                     self.wrapped.reset();
                 }
@@ -137,19 +144,19 @@ impl<P: Plugin> VST2Adapter<P> {
             ////
             // parameters
             ////
-            OpCode::GetParameterName => {
+            effect_opcodes::GET_PARAM_NAME => {
                 let param = param_for_idx!(index);
                 cstrcpy(ptr, param.get_name(), MAX_PARAM_STR_LEN);
                 return 0;
             },
 
-            OpCode::GetParameterLabel => {
+            effect_opcodes::GET_PARAM_LABEL => {
                 let param = param_for_idx!(index);
                 cstrcpy(ptr, param.get_label(), MAX_PARAM_STR_LEN);
                 return 0;
             },
 
-            OpCode::GetParameterDisplay => {
+            effect_opcodes::GET_PARAM_DISPLAY => {
                 let param = param_for_idx!(index);
                 let dest = cstr_as_slice(ptr, MAX_PARAM_STR_LEN);
                 let mut cursor = io::Cursor::new(
@@ -169,22 +176,22 @@ impl<P: Plugin> VST2Adapter<P> {
                 }
             },
 
-            OpCode::CanBeAutomated => return 1,
+            effect_opcodes::CAN_BE_AUTOMATED => return 1,
 
             ////
             // plugin metadata
             ////
-            OpCode::GetEffectName => {
+            effect_opcodes::GET_EFFECT_NAME => {
                 cstrcpy(ptr, P::NAME, MAX_EFFECT_NAME_LEN);
                 return 1;
             },
 
-            OpCode::GetProductName => {
+            effect_opcodes::GET_PRODUCT_STRING => {
                 cstrcpy(ptr, P::PRODUCT, MAX_PRODUCT_STR_LEN);
                 return 1;
             },
 
-            OpCode::GetVendorName => {
+            effect_opcodes::GET_VENDOR_STRING => {
                 cstrcpy(ptr, P::VENDOR, MAX_VENDOR_STR_LEN);
                 return 1;
             },
@@ -192,26 +199,19 @@ impl<P: Plugin> VST2Adapter<P> {
             ////
             // events
             ////
-            OpCode::GetCurrentPresetName => {
-                return 0;
-            },
-
-            ////
-            // events
-            ////
-            OpCode::ProcessEvents => unsafe {
+            effect_opcodes::PROCESS_EVENTS => unsafe {
                 let vst_events = &*(ptr as *const Events);
                 let ev_slice = slice::from_raw_parts(
-                    &vst_events.events[0],
+                    vst_events.events.as_ptr() as *const *const MidiEvent,
                     vst_events.num_events as usize
                 );
 
                 for ev in ev_slice {
-                    if let EventType::Midi = (**ev).event_type {
-                        let ev = *ev as *const vst::api::MidiEvent;
+                    if (**ev).event_type == MIDI_TYPE {
+                        let ev = *ev as *const MidiEvent;
                         self.wrapped.midi_input(
                             (*ev).delta_frames as usize,
-                            (*ev).midi_data
+                            [(*ev).midi_data[0], (*ev).midi_data[1], (*ev).midi_data[2]]
                         );
                     }
                 }
@@ -222,7 +222,7 @@ impl<P: Plugin> VST2Adapter<P> {
             ////
             // state
             ////
-            OpCode::GetData => {
+            effect_opcodes::GET_CHUNK => {
                 let new_state = match self.wrapped.serialise() {
                     None => return 0,
                     Some(s) => s
@@ -238,7 +238,7 @@ impl<P: Plugin> VST2Adapter<P> {
                 return len;
             },
 
-            OpCode::SetData => {
+            effect_opcodes::SET_CHUNK => {
                 let state = unsafe {
                     slice::from_raw_parts(ptr as *mut u8, value as usize)
                 };
@@ -250,7 +250,7 @@ impl<P: Plugin> VST2Adapter<P> {
             ////
             // editor
             ////
-            OpCode::EditorGetRect => {
+            effect_opcodes::EDIT_GET_RECT => {
                 let ptr = ptr as *mut *mut c_void;
 
                 let (width, height) = match self.ui_get_rect() {
@@ -275,20 +275,20 @@ impl<P: Plugin> VST2Adapter<P> {
                 }
             },
 
-            OpCode::EditorOpen => {
+            effect_opcodes::EDIT_OPEN => {
                 return match self.ui_open(ptr) {
                     Ok(_) => 1,
                     Err(_) => 0,
                 };
             },
 
-            OpCode::EditorIdle => {},
+            effect_opcodes::EDIT_IDLE => {},
 
-            OpCode::EditorClose => {
+            effect_opcodes::EDIT_CLOSE => {
                 self.ui_close();
             },
 
-            OpCode::CanDo => {
+            effect_opcodes::CAN_DO => {
                 // get the property
                 let can_do = String::from_utf8_lossy(unsafe {
                     CStr::from_ptr(ptr as *mut c_char).to_bytes()
@@ -296,13 +296,13 @@ impl<P: Plugin> VST2Adapter<P> {
                 .into_owned();
 
                 let can_do = match can_do.as_str() {
-                    "sendVstEvents" => Supported::Yes,
-                    "sendVstMidiEvent" => Supported::Yes,
-                    "receiveVstTimeInfo" => Supported::Yes,
-                    _otherwise => Supported::Maybe,
+                    "sendVstEvents" => 1,
+                    "sendVstMidiEvent" => 1,
+                    "receiveVstTimeInfo" => 1,
+                    _otherwise => 0,
                 };
 
-                return can_do.into();
+                return can_do;
             },
 
             ////
@@ -345,30 +345,28 @@ impl<P: Plugin> VST2Adapter<P> {
         };
 
         let time_info = {
-            let flags = TimeInfoFlags::TEMPO_VALID | TimeInfoFlags::PPQ_POS_VALID;
+            let flags = time_info_flags::TEMPO_VALID | time_info_flags::PPQ_POS_VALID;
 
             let vti = (self.host_cb)(&mut self.effect,
-                host::OpCode::GetTime as i32, 0,
-                flags.bits() as isize,
+                host_opcodes::GET_TIME, 0,
+                flags as isize,
                 ptr::null_mut(), 0.0);
 
             match vti {
                 0 => return mtime,
-                ptr => unsafe { *(ptr as *const TimeInfo) }
+                ptr => unsafe { &*(ptr as *const TimeInfo) }
             }
         };
 
-        let flags = TimeInfoFlags::from_bits_truncate(time_info.flags);
-
-        if flags.contains(TimeInfoFlags::TEMPO_VALID) {
+        if (time_info.flags | time_info_flags::TEMPO_VALID) != 0 {
             mtime.bpm = time_info.tempo;
         }
 
-        if flags.contains(TimeInfoFlags::PPQ_POS_VALID) {
+        if (time_info.flags | time_info_flags::PPQ_POS_VALID) != 0 {
             mtime.beat = time_info.ppq_pos;
         }
 
-        if flags.contains(TimeInfoFlags::TRANSPORT_PLAYING) {
+        if (time_info.flags | TRANSPORT_PLAYING) != 0 {
             mtime.is_playing = true;
         }
 
@@ -419,20 +417,19 @@ impl<P: Plugin> VST2Adapter<P> {
             match bevt.data {
                 event::Data::Midi(midi_data) => {
                     let midi_event: MidiEvent = MidiEvent {
-                        event_type: EventType::Midi,
+                        event_type: MIDI_TYPE,
                         byte_size: mem::size_of::<MidiEvent>() as i32,
                         delta_frames: bevt.frame as i32,
-                        flags: MidiEventFlags::REALTIME_EVENT.bits(),
+                        flags: 1,
                         note_length: 0,
                         note_offset: 0,
-                        midi_data: [midi_data[0], midi_data[1], midi_data[2]],
-                        _midi_reserved: 0,
+                        midi_data: [midi_data[0], midi_data[1], midi_data[2], 0],
                         detune: 0,
                         note_off_velocity: 0,
-                        _reserved1: 0,
-                        _reserved2: 0,
+                        reserved_1: 0,
+                        reserved_2: 0,
                     };
-                    *ev = unsafe { std::mem::transmute(midi_event) };
+                    *ev = midi_event;
 
                     self.output_events_buffer.num_events += 1;
                 }
@@ -449,12 +446,12 @@ impl<P: Plugin> VST2Adapter<P> {
                 .iter_mut()
                 .zip(self.output_events_buffer.event_ptrs.iter_mut())
             {
-                *evt_ptr = evt as *mut Event;
+                *evt_ptr = evt as *mut MidiEvent;
             }
 
             // send to host
             (self.host_cb)(&mut self.effect as *mut AEffect,
-                host::OpCode::ProcessEvents.into(),
+                host_opcodes::PROCESS_EVENTS,
                 0, 0, &self.output_events_buffer as *const _ as *mut _, 0.0);
         }
     }

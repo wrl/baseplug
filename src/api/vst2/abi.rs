@@ -1,9 +1,5 @@
 use std::os::raw::c_void;
 
-use vst::api::consts::*;
-use vst::editor::Rect;
-use vst::api::*;
-
 
 use super::*;
 
@@ -16,7 +12,7 @@ macro_rules! adapter_from_effect {
 
 macro_rules! forward_to_adapter {
     ($method:ident, ($($arg:ident: $ty:ty),+), $ret:ty) => {
-        fn $method<T: Plugin>(effect: *mut AEffect, $($arg: $ty,)+) -> $ret {
+        extern "C" fn $method<T: Plugin>(effect: *mut AEffect, $($arg: $ty,)+) -> $ret {
             let adapter = unsafe { adapter_from_effect!(effect) };
             adapter.$method($($arg,)+)
         }
@@ -43,26 +39,20 @@ forward_to_adapter!(
     (in_buffers: *const *const f32, out_buffers: *mut *mut f32, nframes: i32),
     ());
 
-fn process_deprecated(_effect: *mut AEffect, _in: *const *const f32,
+extern "C" fn process_deprecated(_effect: *mut AEffect, _in: *const *const f32,
     _out: *mut *mut f32, _nframes: i32)
 {
 }
 
-fn process_replacing_f64(_effect: *mut AEffect, _in: *const *const f64,
-    _out: *mut *mut f64, _nframes: i32)
-{
-}
-
 pub fn plugin_main<P: Plugin>(host_cb: HostCallbackProc, unique_id: &[u8; 4]) -> *mut AEffect {
-    let mut flags =
-        PluginFlags::CAN_REPLACING | PluginFlags::PROGRAM_CHUNKS;
+    let mut flags = effect_flags::CAN_REPLACING | effect_flags::PROGRAM_CHUNKS;
 
     if WrappedPlugin::<P>::wants_midi_input() {
-        flags |= PluginFlags::IS_SYNTH;
+        flags |= effect_flags::IS_SYNTH;
     }
 
     if VST2Adapter::<P>::has_ui() {
-        flags |= PluginFlags::HAS_EDITOR;
+        flags |= effect_flags::HAS_EDITOR;
     }
 
     let unique_id =
@@ -73,40 +63,35 @@ pub fn plugin_main<P: Plugin>(host_cb: HostCallbackProc, unique_id: &[u8; 4]) ->
 
     let adapter = Box::new(VST2Adapter::<P> {
         effect: AEffect {
-            magic: VST_MAGIC,
+            magic: MAGIC,
 
             dispatcher: dispatch::<P>,
-            setParameter: set_parameter::<P>,
-            getParameter: get_parameter::<P>,
+            process: process_deprecated,
+            set_parameter: set_parameter::<P>,
+            get_parameter: get_parameter::<P>,
 
-            _process: process_deprecated,
+            num_programs: 0,
+            num_params: <P::Model as Model<P>>::Smooth::PARAMS.len() as i32,
+            num_inputs: P::INPUT_CHANNELS as i32,
+            num_outputs: P::OUTPUT_CHANNELS as i32,
 
-            numPrograms: 0,
-            numParams: <P::Model as Model<P>>::Smooth::PARAMS.len() as i32,
-            numInputs: P::INPUT_CHANNELS as i32,
-            numOutputs: P::OUTPUT_CHANNELS as i32,
+            flags: flags,
 
-            flags: flags.bits(),
+            ptr_1: ptr::null_mut(),
+            ptr_2: ptr::null_mut(),
 
-            reserved1: 0,
-            reserved2: 0,
+            initial_delay: 0,
 
-            initialDelay: 0,
-
-            _realQualities: 0,
-            _offQualities: 0,
-            _ioRatio: 0.0,
+            empty_2: [0; 8],
+            unknown_float: 0.0,
 
             object: ptr::null_mut(),
             user: ptr::null_mut(),
 
-            uniqueId: unique_id as i32,
+            unique_id: unique_id as i32,
             version: 0,
 
-            processReplacing: process_replacing::<P>,
-            processReplacingF64: process_replacing_f64,
-
-            future: [0u8; 56]
+            process_replacing: process_replacing::<P>,
         },
         
         host_cb,
@@ -132,9 +117,6 @@ pub fn plugin_main<P: Plugin>(host_cb: HostCallbackProc, unique_id: &[u8; 4]) ->
 #[macro_export]
 macro_rules! vst2 {
     ($plugin:ty, $unique_id:expr) => {
-        use std::os::raw::c_void;
-        use std::mem::transmute;
-
         #[cfg(crate_type="bin")]
         std::compile_error!("vst2 requires an exported main() symbol, this will conflict for example with `cargo test` and non dynamic library crates.");
 
@@ -143,15 +125,14 @@ macro_rules! vst2 {
 
         #[allow(non_snake_case)]
         #[no_mangle]
-        pub unsafe extern "C" fn main(host_callback: fn()) -> *mut c_void {
+        pub extern "C" fn main(host_callback: $crate::api::vst2::vst2_sys::HostCallbackProc) -> *mut $crate::api::vst2::vst2_sys::AEffect {
             VSTPluginMain(host_callback)
         }
 
         #[allow(non_snake_case)]
         #[no_mangle]
-        pub unsafe extern "C" fn VSTPluginMain(host_callback: fn()) -> *mut c_void {
-            $crate::api::vst2::plugin_main::<$plugin>(
-                transmute(host_callback), $unique_id) as *mut _
+        pub extern "C" fn VSTPluginMain(host_callback: $crate::api::vst2::vst2_sys::HostCallbackProc) -> *mut $crate::api::vst2::vst2_sys::AEffect {
+            $crate::api::vst2::plugin_main::<$plugin>(host_callback, $unique_id) as *mut $crate::api::vst2::vst2_sys::AEffect
         }
     }
 }
