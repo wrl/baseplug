@@ -52,14 +52,18 @@ unsafe impl HasRawWindowHandle for VST2WindowHandle {
 }
 
 pub(super) trait VST2UI {
+    type P: Plugin;
+
     fn has_ui() -> bool;
 
     fn ui_get_rect(&self) -> Option<(i16, i16)>;
-    fn ui_open(&mut self, parent: *mut c_void) -> WindowOpenResult<()>;
+    fn ui_open(&mut self, model: <<Self::P as Plugin>::Model as Model<Self::P>>::UIShared, parent: *mut c_void) -> WindowOpenResult<()>;
     fn ui_close(&mut self);
 }
 
 impl<P: Plugin> VST2UI for VST2Adapter<P> {
+    type P = P;
+
     default fn has_ui() -> bool {
         false
     }
@@ -68,7 +72,7 @@ impl<P: Plugin> VST2UI for VST2Adapter<P> {
         None
     }
 
-    default fn ui_open(&mut self, _parent: *mut c_void) -> WindowOpenResult<()> {
+    default fn ui_open(&mut self, _model: <P::Model as Model<P>>::UIShared, _parent: *mut c_void) -> WindowOpenResult<()> {
         Err(())
     }
 
@@ -84,11 +88,11 @@ impl<P: PluginUI> VST2UI for VST2Adapter<P> {
         Some(P::ui_size())
     }
 
-    fn ui_open(&mut self, parent: *mut c_void) -> WindowOpenResult<()> {
+    fn ui_open(&mut self, model: <P::Model as Model<P>>::UIShared, parent: *mut c_void) -> WindowOpenResult<()> {
         let parent = VST2WindowHandle(parent);
 
         if self.wrapped.ui_handle.is_none() {
-            P::ui_open(&parent)
+            P::ui_open(&parent, model)
                 .map(|handle| self.wrapped.ui_handle = Some(handle))
         } else {
             Ok(())

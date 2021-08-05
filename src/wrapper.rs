@@ -1,6 +1,7 @@
 use crate::{
     Model,
     SmoothModel,
+    UISharedModel,
 
     Plugin,
     PluginUI,
@@ -47,8 +48,7 @@ impl<P: Plugin> WrappedPlugin<P> {
             plug: P::new(48000.0, &P::Model::default()),
             events: Vec::with_capacity(512),
             output_events: Vec::with_capacity(256),
-            smoothed_model:
-                <P::Model as Model<P>>::Smooth::from_model(P::Model::default()),
+            smoothed_model: <P::Model as Model<P>>::Smooth::from_model(P::Model::default()),
             sample_rate: 0.0,
 
             ui_handle: None
@@ -128,6 +128,11 @@ impl<P: Plugin> WrappedPlugin<P> {
         };
 
         self.smoothed_model.set(&m);
+    }
+
+    pub(crate) fn get_new_ui_model(&self) -> <P::Model as Model<P>>::UIShared {
+        // Don't mind me, just sprinkling in my fair share of generic monstrosities.
+        <<P::Model as Model<P>>::UIShared as UISharedModel<P, P::Model>>::from_smooth_model(&self.smoothed_model)
     }
 
     ////

@@ -46,7 +46,7 @@ pub struct Param<P: Plugin, Model> {
     pub dsp_notify: Option<fn(&mut P)>,
 
     pub set_cb: fn(&Param<P, Model>, &mut Model, f32),
-    pub get_cb: fn(&Param<P, Model>, &Model) -> f32
+    pub get_cb: fn(&Param<P, Model>, &Model) -> f32,
 }
 
 impl<P: Plugin, Model> Param<P, Model> {

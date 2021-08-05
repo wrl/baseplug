@@ -5,9 +5,11 @@ pub trait Model<P: Plugin>: Sized + Default + 'static {
     type Smooth:
         SmoothModel<P, Self>
         + Parameters<P, Self::Smooth>;
+    
+    type UIShared: UISharedModel<P, Self>;
 }
 
-pub trait SmoothModel<P: Plugin, T: Model<P>>: Sized + 'static{
+pub trait SmoothModel<P: Plugin, T: Model<P>>: Sized + 'static {
     type Process<'proc>;
 
     fn from_model(model: T) -> Self;
@@ -23,4 +25,8 @@ pub trait SmoothModel<P: Plugin, T: Model<P>>: Sized + 'static{
 
     fn current_value(&'_ mut self) -> Self::Process<'_>;
     fn process(&'_ mut self, nframes: usize) -> Self::Process<'_>;
+}
+
+pub trait UISharedModel<P: Plugin, T: Model<P>>: Sized + 'static {
+    fn from_smooth_model(model: &T::Smooth) -> Self;
 }

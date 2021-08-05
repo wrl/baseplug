@@ -1,8 +1,11 @@
 use std::fmt;
 use std::ops;
 use std::slice;
+use std::sync::Arc;
 
 use num_traits::Float;
+
+use crate::AtomicFloat;
 
 const SETTLE: f32 = 0.00001f32;
 
@@ -40,6 +43,109 @@ impl<'a, T, I> ops::Index<I> for SmoothOutput<'a, T>
     #[inline]
     fn index(&self, idx: I) -> &I::Output {
         &self.values[idx]
+    }
+}
+
+pub struct UIShared {
+    shared: Arc<AtomicFloat>,
+}
+
+impl UIShared {
+    pub fn new(value: f32) -> Self {
+        Self {
+            shared: Arc::new(AtomicFloat::new(value))
+        }
+    }
+
+    #[inline]
+    pub fn get(&self) -> f32 {
+        self.shared.get()
+    }
+
+    #[inline]
+    pub fn set(&self, value: f32) {
+        self.shared.set(value);
+    }
+
+    #[inline]
+    pub fn clone(&self) -> UIShared {
+        UIShared { shared: Arc::clone(&self.shared) }
+    }
+}
+
+pub struct SmoothParam {
+    ui_shared_value: UIShared,
+    smooth: Smooth<f32>,
+}
+
+impl SmoothParam {
+    pub fn new(input: f32) -> Self {
+        Self {
+            ui_shared_value: UIShared::new(input),
+            smooth: Smooth::new(input),
+        }
+    }
+
+    #[inline]
+    pub fn reset(&mut self, val: f32) {
+        self.ui_shared_value.set(val);
+        self.reset(val);
+    }
+
+    #[inline]
+    pub fn set(&mut self, val: f32) {
+        self.ui_shared_value.set(val);
+        self.set(val);
+    }
+
+    #[inline]
+    pub fn dest(&self) -> f32 {
+        self.smooth.dest()
+    }
+
+    #[inline]
+    pub fn output(&self) -> SmoothOutput<f32> {
+        self.smooth.output()
+    }
+
+    #[inline]
+    pub fn current_value(&self) -> SmoothOutput<f32> {
+        self.smooth.current_value()
+    }
+
+    #[inline]
+    pub fn update_status_with_epsilon(&mut self, epsilon: f32) -> SmoothStatus {
+        self.smooth.update_status_with_epsilon(epsilon)
+    }
+
+    pub fn process(&mut self, nframes: usize) {
+        // Check for updated value from UI.
+        let value = self.ui_shared_value.get();
+        if self.smooth.dest() != value {
+            self.smooth.set(value);
+        }
+
+        self.smooth.process(nframes);
+    }
+
+    #[inline]
+    pub fn is_active(&self) -> bool {
+        self.smooth.is_active()
+    }
+
+    #[inline]
+    pub fn set_speed_ms(&mut self, sample_rate: f32, ms: f32) {
+        self.smooth.set_speed_ms(sample_rate, ms)
+    }
+
+    #[inline]
+    pub fn update_status(&mut self) -> SmoothStatus {
+        self.smooth.update_status()
+    }
+
+    #[inline]
+    pub fn ui_shared(&self) -> UIShared {
+        self.ui_shared_value.clone()
     }
 }
 

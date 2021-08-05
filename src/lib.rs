@@ -8,16 +8,21 @@ pub mod util;
 #[macro_use]
 pub mod api;
 
+mod atomic_float;
+pub use atomic_float::AtomicFloat;
+
 mod smooth;
 pub use smooth::{
     Smooth,
+    SmoothParam,
     SmoothOutput,
-    SmoothStatus
+    SmoothStatus,
+    UIShared,
 };
 
 mod declick;
 pub use declick::{
-    Declick,
+    DeclickParam,
     DeclickOutput
 };
 

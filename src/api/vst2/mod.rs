@@ -268,7 +268,9 @@ impl<P: Plugin> VST2Adapter<P> {
             },
 
             effect_opcodes::EDIT_OPEN => {
-                return match self.ui_open(ptr) {
+                let ui_shared_model = self.wrapped.get_new_ui_model();
+
+                return match self.ui_open(ui_shared_model, ptr) {
                     Ok(_) => 1,
                     Err(_) => 0,
                 };

@@ -23,8 +23,8 @@ impl WrappingType {
         use WrappingType::*;
 
         match self {
-            Smooth => quote!(::baseplug::Smooth),
-            Declick => quote!(::baseplug::Declick)
+            Smooth => quote!(::baseplug::SmoothParam),
+            Declick => quote!(::baseplug::DeclickParam)
         }
     }
 }
@@ -50,7 +50,7 @@ struct ParameterInfo {
     label: Option<String>,
     unit: Option<String>,
     gradient: Option<String>,
-    dsp_notify: Option<String>
+    dsp_notify: Option<String>,
 }
 
 struct FieldInfo<'a> {
@@ -63,7 +63,7 @@ struct FieldInfo<'a> {
     bounds: ModelBounds,
     smooth_ms: f32,
 
-    parameter_info: Option<ParameterInfo>
+    parameter_info: Option<ParameterInfo>,
 }
 
 impl<'a> FieldInfo<'a> {
@@ -86,7 +86,7 @@ impl<'a> FieldInfo<'a> {
             bounds: ModelBounds::default(),
             smooth_ms: 5.0f32,
 
-            parameter_info: None
+            parameter_info: None,
         };
 
         for attr in f.attrs.iter() {
@@ -168,7 +168,7 @@ impl<'a> FieldInfo<'a> {
             label,
             unit,
             gradient,
-            dsp_notify
+            dsp_notify,
         });
     }
 
@@ -334,11 +334,16 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
             match wrapping {
                 Some(wrap_type) => {
                     let smoothed_type = wrap_type.as_token_stream();
-                    quote!(#vis #ident: #smoothed_type<#ty>)
+                    quote!(#vis #ident: #smoothed_type)
                 },
 
                 None => quote!(#vis #ident: #ty)
             }
+        });
+
+    let ui_shared_fields = fields_base.iter()
+        .map(|FieldInfo { vis, ident, .. }| {
+            quote!(#vis #ident: ::baseplug::UIShared)
         });
 
     let proc_fields = fields_base.iter()
@@ -428,10 +433,25 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
     let from_model_fields = fields_base.iter()
         .map(|FieldInfo { ident, wrapping, .. }| {
             match wrapping {
-                Some(WrappingType::Smooth) =>
-                    quote!(#ident: ::baseplug::Smooth::new(model.#ident)),
-                Some(WrappingType::Declick) =>
-                    quote!(#ident: ::baseplug::Declick::new(model.#ident)),
+                Some(WrappingType::Smooth) => {
+                    quote!(#ident: ::baseplug::SmoothParam::new(model.#ident))
+                }
+                Some(WrappingType::Declick) => {
+                    quote!(#ident: ::baseplug::DeclickParam::new(model.#ident))
+                }
+                None => quote!(#ident: model.#ident)
+            }
+        });
+
+    let from_smooth_model_fields_ui = fields_base.iter()
+        .map(|FieldInfo { ident, wrapping, .. }| {
+            match wrapping {
+                Some(WrappingType::Smooth) => {
+                    quote!(#ident: model.#ident.ui_shared())
+                }
+                Some(WrappingType::Declick) => {
+                    quote!(#ident: model.#ident)
+                }
                 None => quote!(#ident: model.#ident)
             }
         });
@@ -471,6 +491,7 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
 
     let smoothed_ident = format_ident!("{}Smooth", model_name);
     let proc_ident = format_ident!("{}Process", model_name);
+    let ui_shared_ident = format_ident!("{}UIShared", model_name);
 
     let impl_params = format_ident!("_IMPL_PARAMETERS_FOR_{}", model_name);
 
@@ -494,8 +515,14 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
         }
 
         #[doc(hidden)]
+        #model_vis struct #ui_shared_ident {
+            #( #ui_shared_fields ),*
+        }
+
+        #[doc(hidden)]
         impl<P: ::baseplug::Plugin> ::baseplug::Model<P> for #model_name {
             type Smooth = #smoothed_ident;
+            type UIShared = #ui_shared_ident;
         }
 
         #[doc(hidden)]
@@ -537,6 +564,15 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
 
                 #proc_ident {
                     #( #get_process_fields ),*
+                }
+            }
+        }
+
+        #[doc(hidden)]
+        impl<P: ::baseplug::Plugin> ::baseplug::UISharedModel<P, #model_name> for #ui_shared_ident {
+            fn from_smooth_model(model: &#smoothed_ident) -> Self {
+                Self {
+                    #( #from_smooth_model_fields_ui ),*
                 }
             }
         }

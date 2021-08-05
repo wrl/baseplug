@@ -15,7 +15,7 @@ pub struct DeclickOutput<'a, T> {
     pub status: SmoothStatus
 }
 
-pub struct Declick<T: Sized + Clone> {
+pub struct DeclickParam<T: Sized + Clone> {
     current: T,
     next: Option<T>,
     staged: Option<T>,
@@ -23,7 +23,7 @@ pub struct Declick<T: Sized + Clone> {
     fade: Smooth<f32>
 }
 
-impl<T> Declick<T>
+impl<T> DeclickParam<T>
     where T: Sized + Clone + Eq
 {
     pub fn new(initial: T) -> Self {
@@ -122,7 +122,7 @@ impl<T> Declick<T>
     }
 }
 
-impl<T> fmt::Debug for Declick<T>
+impl<T> fmt::Debug for DeclickParam<T>
     where T: fmt::Debug + Sized + Clone
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
