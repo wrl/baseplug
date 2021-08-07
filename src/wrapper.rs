@@ -1,7 +1,8 @@
+use std::sync::Arc;
+
 use crate::{
     Model,
     SmoothModel,
-    UISharedModel,
 
     Plugin,
     PluginUI,
@@ -16,6 +17,10 @@ use crate::{
     Event,
     event
 };
+
+pub trait UIHostCallback: Send + Sync {
+    fn send_parameter_update(&self, param_idx: usize, normalized: f32);
+}
 
 pub(crate) struct WrappedPlugin<P: Plugin> {
     pub(crate) plug: P,
@@ -90,14 +95,12 @@ impl<P: Plugin> WrappedPlugin<P> {
                 frame: 0,
                 data: event::Data::Parameter {
                     param,
-                    val
+                    val,
                 }
             });
         } else {
             param.set(&mut self.smoothed_model, val);
         }
-
-        self.ui_param_notify(param, val);
     }
 
     fn set_parameter_from_event(&mut self, param: &Param<P, <P::Model as Model<P>>::Smooth>, val: f32) {
@@ -130,9 +133,8 @@ impl<P: Plugin> WrappedPlugin<P> {
         self.smoothed_model.set(&m);
     }
 
-    pub(crate) fn get_new_ui_model(&self) -> <P::Model as Model<P>>::UIShared {
-        // Don't mind me, just sprinkling in my fair share of generic monstrosities.
-        <<P::Model as Model<P>>::UIShared as UISharedModel<P, P::Model>>::from_smooth_model(&self.smoothed_model)
+    pub(crate) fn as_ui_model(&self, ui_host_callback: Arc<dyn UIHostCallback>) -> <P::Model as Model<P>>::UI {
+        <<P::Model as Model<P>>::Smooth as SmoothModel<P, P::Model>>::as_ui_model(&self.smoothed_model, ui_host_callback)
     }
 
     ////
@@ -246,7 +248,7 @@ impl<P: Plugin> WrappedPlugin<P> {
                     musical_time: &musical_time
                 };
 
-                let proc_model = self.smoothed_model.process(block_frames);
+                let proc_model = self.smoothed_model.process(block_frames, &mut self.plug);
                 self.plug.process(&proc_model, &mut context);
             }
 
@@ -309,30 +311,12 @@ impl<T: MidiReceiver> WrappedPluginMidiInput for WrappedPlugin<T> {
 
 pub(crate) trait WrappedPluginUI<P: Plugin> {
     type UIHandle;
-
-    fn ui_param_notify(&self,
-        param: &'static Param<P, <P::Model as Model<P>>::Smooth>, val: f32);
 }
 
 impl<P: Plugin> WrappedPluginUI<P> for WrappedPlugin<P> {
     default type UIHandle = ();
-
-    #[inline]
-    default fn ui_param_notify(&self,
-        _param: &'static Param<P, <P::Model as Model<P>>::Smooth>, _val: f32)
-    {
-    }
 }
 
 impl<P: PluginUI> WrappedPluginUI<P> for WrappedPlugin<P> {
     type UIHandle = P::Handle;
-
-    #[inline]
-    fn ui_param_notify(&self,
-        param: &'static Param<P, <P::Model as Model<P>>::Smooth>, val: f32)
-    {
-        if let Some(ui_handle) = self.ui_handle.as_ref() {
-            P::ui_param_notify(ui_handle, param, val);
-        }
-    }
 }

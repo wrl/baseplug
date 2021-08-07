@@ -7,7 +7,8 @@ use quote::*;
 
 enum WrappingType {
     Smooth,
-    Declick
+    Declick,
+    Unsmoothed,
 }
 
 impl WrappingType {
@@ -16,15 +17,6 @@ impl WrappingType {
             Self::Smooth
         } else {
             Self::Declick
-        }
-    }
-
-    fn as_token_stream(&self) -> TokenStream {
-        use WrappingType::*;
-
-        match self {
-            Smooth => quote!(::baseplug::SmoothParam),
-            Declick => quote!(::baseplug::DeclickParam)
         }
     }
 }
@@ -99,7 +91,11 @@ impl<'a> FieldInfo<'a> {
 
                 Ok(Meta::Path(ref path)) => {
                     if path.is_ident("unsmoothed") {
-                        info.wrapping = None;
+                        info.wrapping = if let Some(WrappingType::Smooth) = info.wrapping {
+                            Some(WrappingType::Unsmoothed)
+                        } else {
+                            None
+                        };
                     }
 
                     continue
@@ -193,7 +189,7 @@ impl<'a> FieldInfo<'a> {
         });
     }
 
-    fn parameter_repr(&self, model: &Ident) -> Option<TokenStream> {
+    fn parameter_repr(&self, model: &Ident, idx: usize) -> Option<TokenStream> {
         let param = match self.parameter_info {
             Some(ref p) => p,
             None => return None
@@ -206,7 +202,14 @@ impl<'a> FieldInfo<'a> {
         let short_name = param.short_name.as_ref()
             .map_or_else(|| quote!(None), |sn| quote!(Some(#sn)));
         let label = param.label.as_ref()
-            .map_or_else(|| quote!(""), |l| quote!(#l));
+            .map_or_else(|| {
+                match param.unit.as_ref().map(|x| x.as_str()) {
+                    Some("Decibels") => quote!("dB"),
+                    _ => quote!("")
+                }
+            },
+            |l| quote!(#l)
+        );
 
         let dsp_notify = param.dsp_notify.as_ref()
             .map_or_else(|| quote!(None), |dn| {
@@ -240,7 +243,7 @@ impl<'a> FieldInfo<'a> {
 
         let model_get = match self.wrapping {
             None => quote!(model.#ident),
-            _ => quote!(model.#ident.dest())
+            _ => quote!(model.#ident.dsp_value())
         };
 
         let display_cb = match param.unit.as_ref().map(|x| x.as_str()) {
@@ -287,12 +290,17 @@ impl<'a> FieldInfo<'a> {
 
         Some(quote!(
             ::baseplug::Param {
-                name: #name,
-                short_name: #short_name,
+                info: ::baseplug::ParamInfo {
+                    name: #name,
+                    short_name: #short_name,
+                    label: #label,
 
-                unit: ::baseplug::parameter::Unit::#unit,
+                    unit: ::baseplug::parameter::Unit::#unit,
+                    param_type: #param_type,
 
-                param_type: #param_type,
+                    idx: #idx,
+                },
+
                 format: ::baseplug::parameter::Format {
                     display_cb: #display_cb,
                     label: #label
@@ -330,20 +338,44 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
         });
 
     let smoothed_fields = fields_base.iter()
-        .map(|FieldInfo { vis, ident, wrapping, ty, .. }| {
+        .map(|FieldInfo { vis, ident, wrapping, ty, parameter_info, .. }| {
             match wrapping {
-                Some(wrap_type) => {
-                    let smoothed_type = wrap_type.as_token_stream();
-                    quote!(#vis #ident: #smoothed_type)
-                },
-
+                Some(WrappingType::Smooth) => {
+                    if parameter_info.is_some() {
+                        quote!(#vis #ident: ::baseplug::SmoothFloatParam)
+                    } else {
+                        quote!(#vis #ident: ::baseplug::SmoothFloatEntry)
+                    }
+                }
+                Some(WrappingType::Declick) => {
+                    quote!(#vis #ident: ::baseplug::DeclickParam)
+                }
+                Some(WrappingType::Unsmoothed) => {
+                    if parameter_info.is_some() {
+                        quote!(#vis #ident: ::baseplug::UnsmoothedFloatParam)
+                    } else {
+                        quote!(#vis #ident: ::baseplug::UnsmoothedFloatEntry)
+                    }
+                }
                 None => quote!(#vis #ident: #ty)
             }
         });
 
-    let ui_shared_fields = fields_base.iter()
-        .map(|FieldInfo { vis, ident, .. }| {
-            quote!(#vis #ident: ::baseplug::UIShared)
+    let ui_fields = fields_base.iter()
+        .map(|FieldInfo { vis, ident, wrapping, ty, parameter_info, .. }| {
+            match wrapping {
+                Some(WrappingType::Smooth) | Some(WrappingType::Unsmoothed) => {
+                    if parameter_info.is_some() {
+                        quote!(#vis #ident: ::baseplug::UIFloatParam)
+                    } else {
+                        quote!(#vis #ident: ::baseplug::UIFloatEntry)
+                    }
+                }
+                Some(WrappingType::Declick) => {
+                    quote!(#vis #ident: #ty)
+                }
+                None => quote!(#vis #ident: #ty)
+            }
         });
 
     let proc_fields = fields_base.iter()
@@ -357,7 +389,7 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
                     quote!(#vis #ident:
                         ::baseplug::DeclickOutput<'proc, #ty>),
 
-                None => quote!(#vis #ident: &'proc #ty)
+                _ => quote!(#vis #ident: &'proc #ty)
             }
         });
 
@@ -385,6 +417,10 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
                             status: out.status
                         }
                     }),
+                
+                Some(WrappingType::Unsmoothed) => {
+                    quote!(#ident: self.#ident.dsp_value())
+                }
 
                 None => quote!(#ident: &self.#ident)
             }
@@ -414,6 +450,10 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
                             status: out.status
                         }
                     }),
+                
+                Some(WrappingType::Unsmoothed) => {
+                    quote!(#ident: self.#ident.dsp_value())
+                }
 
                 None => quote!(#ident: &self.#ident)
             }
@@ -422,7 +462,7 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
     let set_statements = fields_base.iter()
         .map(|FieldInfo { ident, wrapping, .. }| {
             match wrapping {
-                Some(WrappingType::Smooth) =>
+                Some(WrappingType::Smooth) | Some(WrappingType::Unsmoothed) =>
                     quote!(self.#ident.set(from.#ident)),
                 Some(WrappingType::Declick) =>
                     quote!(self.#ident.set(from.#ident.clone())),
@@ -431,26 +471,24 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
         });
 
     let from_model_fields = fields_base.iter()
-        .map(|FieldInfo { ident, wrapping, .. }| {
+        .map(|FieldInfo { ident, wrapping, parameter_info, .. }| {
             match wrapping {
                 Some(WrappingType::Smooth) => {
-                    quote!(#ident: ::baseplug::SmoothParam::new(model.#ident))
+                    if parameter_info.is_some() {
+                        quote!(#ident: ::baseplug::SmoothFloatParam::new(model.#ident, &(params.next().unwrap().info)))
+                    } else {
+                        quote!(#ident: ::baseplug::SmoothFloatEntry::new(model.#ident))
+                    }
                 }
                 Some(WrappingType::Declick) => {
                     quote!(#ident: ::baseplug::DeclickParam::new(model.#ident))
                 }
-                None => quote!(#ident: model.#ident)
-            }
-        });
-
-    let from_smooth_model_fields_ui = fields_base.iter()
-        .map(|FieldInfo { ident, wrapping, .. }| {
-            match wrapping {
-                Some(WrappingType::Smooth) => {
-                    quote!(#ident: model.#ident.ui_shared())
-                }
-                Some(WrappingType::Declick) => {
-                    quote!(#ident: model.#ident)
+                Some(WrappingType::Unsmoothed) => {
+                    if parameter_info.is_some() {
+                        quote!(#ident: ::baseplug::UnsmoothedFloatParam::new(model.#ident, &(params.next().unwrap().info)))
+                    } else {
+                        quote!(#ident: ::baseplug::UnsmoothedFloatEntry::new(model.#ident))
+                    }
                 }
                 None => quote!(#ident: model.#ident)
             }
@@ -459,7 +497,7 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
     let reset_statements = fields_base.iter()
         .map(|FieldInfo { ident, wrapping, .. }| {
             match wrapping {
-                Some(WrappingType::Smooth) =>
+                Some(WrappingType::Smooth) | Some(WrappingType::Unsmoothed) =>
                     quote!(self.#ident.reset(from.#ident)),
                 Some(WrappingType::Declick) =>
                     quote!(self.#ident.reset(from.#ident.clone())),
@@ -468,36 +506,85 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
         });
 
     let process_statements = fields_base.iter()
-        .map(|FieldInfo { ident, wrapping, .. }| {
-            wrapping.as_ref().map(|_|
-                quote!(self.#ident.process(nframes)))
+        .map(|FieldInfo { ident, wrapping, parameter_info, .. }| {
+            match wrapping {
+                Some(WrappingType::Smooth) | Some(WrappingType::Unsmoothed) => {
+                    if parameter_info.is_some() {
+                        Some(quote!(self.#ident.process(nframes, plug)))
+                    } else {
+                        Some(quote!(self.#ident.process(nframes)))
+                    }
+                }
+                Some(WrappingType::Declick) => {
+                    Some(quote!(self.#ident.process(nframes)))
+                }
+                None => None
+            }
         });
 
     let set_sample_rate_statements = fields_base.iter()
-        .map(|FieldInfo { ident, wrapping, smooth_ms, .. }| {
-            wrapping.as_ref().map(|_|
-                quote!(self.#ident.set_speed_ms(sample_rate, #smooth_ms)))
+        .map(|FieldInfo { ident, wrapping, smooth_ms,.. }| {
+            match wrapping {
+                Some(WrappingType::Smooth) | Some(WrappingType::Declick) => {
+                    Some(quote!(self.#ident.set_speed_ms(sample_rate, #smooth_ms)))
+                }
+                _ => None,
+            }
+        });
+    
+    let ui_update_statements = fields_base.iter()
+        .map(|FieldInfo { ident, wrapping, .. }| {
+            match wrapping {
+                Some(WrappingType::Smooth) | Some(WrappingType::Unsmoothed) => {
+                    Some(quote!(self.#ident._poll_update()))
+                }
+                _ => None,
+            }
         });
 
     let as_model_fields = fields_base.iter()
         .map(|FieldInfo { ident, wrapping, .. }| {
             match wrapping {
-                Some(WrappingType::Smooth) => quote!(#ident: self.#ident.dest()),
+                Some(WrappingType::Smooth) | Some(WrappingType::Unsmoothed) => quote!(#ident: self.#ident.dsp_value()),
                 Some(WrappingType::Declick) =>
                     quote!(#ident: self.#ident.dest().clone()),
                 None => quote!(#ident: self.#ident)
             }
         });
 
+    let as_model_fields_ui = fields_base.iter()
+        .map(|FieldInfo { ident, wrapping, parameter_info, .. }| {
+            match wrapping {
+                Some(WrappingType::Smooth) | Some(WrappingType::Unsmoothed) => {
+                    if parameter_info.is_some() {
+                        quote!(#ident: self.#ident.get_ui_param(std::sync::Arc::clone(&ui_host_callback)))
+                    } else {
+                        quote!(#ident: self.#ident.get_ui_entry())
+                    }
+                }
+                Some(WrappingType::Declick) => {
+                    quote!(#ident: self.#ident)
+                }
+                None => quote!(#ident: self.#ident)
+            }
+        });
+
     let smoothed_ident = format_ident!("{}Smooth", model_name);
     let proc_ident = format_ident!("{}Process", model_name);
-    let ui_shared_ident = format_ident!("{}UIShared", model_name);
+    let ui_ident = format_ident!("{}UI", model_name);
 
     let impl_params = format_ident!("_IMPL_PARAMETERS_FOR_{}", model_name);
-
+    
+    let mut idx: usize = 0;
     let parameters = fields_base.iter()
-        .filter_map(|field: &FieldInfo|
-            field.parameter_repr(&smoothed_ident));
+        .filter_map(|field: &FieldInfo| {
+            let res = field.parameter_repr(&smoothed_ident, idx);
+            if res.is_some() {
+                idx += 1;
+            }
+            res
+        }
+    );
 
     quote!(
         #( #attrs )*
@@ -515,14 +602,15 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
         }
 
         #[doc(hidden)]
-        #model_vis struct #ui_shared_ident {
-            #( #ui_shared_fields ),*
+        #model_vis struct #ui_ident {
+            #( #ui_fields ),*,
+            first_frame: bool,
         }
 
         #[doc(hidden)]
         impl<P: ::baseplug::Plugin> ::baseplug::Model<P> for #model_name {
             type Smooth = #smoothed_ident;
-            type UIShared = #ui_shared_ident;
+            type UI = #ui_ident;
         }
 
         #[doc(hidden)]
@@ -530,6 +618,8 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
             type Process<'proc> = #proc_ident<'proc>;
 
             fn from_model(model: #model_name) -> Self {
+                let mut params = <<#model_name as ::baseplug::Model<P>>::Smooth as ::baseplug::Parameters<P, #smoothed_ident>>::PARAMS.iter();
+
                 Self {
                     #( #from_model_fields ),*
                 }
@@ -559,20 +649,30 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
                 }
             }
 
-            fn process<'proc>(&'proc mut self, nframes: usize) -> Self::Process<'proc> {
+            fn process<'proc>(&'proc mut self, nframes: usize, plug: &mut P) -> Self::Process<'proc> {
                 #( #process_statements ;)*
 
                 #proc_ident {
                     #( #get_process_fields ),*
                 }
             }
+
+            fn as_ui_model(&self, ui_host_callback: std::sync::Arc<dyn ::baseplug::UIHostCallback>) -> #ui_ident {
+                #ui_ident {
+                    #( #as_model_fields_ui ),*,
+                    first_frame: true,
+                }
+            }
         }
 
         #[doc(hidden)]
-        impl<P: ::baseplug::Plugin> ::baseplug::UISharedModel<P, #model_name> for #ui_shared_ident {
-            fn from_smooth_model(model: &#smoothed_ident) -> Self {
-                Self {
-                    #( #from_smooth_model_fields_ui ),*
+        impl ::baseplug::UIModel for #ui_ident {
+            fn update(&mut self) {
+                // Skip updating on the first frame so the UI gets a chance to get all initial values.
+                if self.first_frame {
+                    self.first_frame = false;
+                } else {
+                    #( #ui_update_statements ;)*
                 }
             }
         }

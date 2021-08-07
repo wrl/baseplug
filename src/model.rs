@@ -1,12 +1,13 @@
 use crate::*;
-
+use crate::wrapper::UIHostCallback;
+use std::sync::Arc;
 
 pub trait Model<P: Plugin>: Sized + Default + 'static {
     type Smooth:
         SmoothModel<P, Self>
         + Parameters<P, Self::Smooth>;
     
-    type UIShared: UISharedModel<P, Self>;
+    type UI: UIModel;
 }
 
 pub trait SmoothModel<P: Plugin, T: Model<P>>: Sized + 'static {
@@ -24,9 +25,11 @@ pub trait SmoothModel<P: Plugin, T: Model<P>>: Sized + 'static {
     fn reset(&mut self, from: &T);
 
     fn current_value(&'_ mut self) -> Self::Process<'_>;
-    fn process(&'_ mut self, nframes: usize) -> Self::Process<'_>;
+    fn process(&'_ mut self, nframes: usize, plug: &mut P) -> Self::Process<'_>;
+
+    fn as_ui_model(&self, ui_host_callback: Arc<dyn UIHostCallback>) -> T::UI;
 }
 
-pub trait UISharedModel<P: Plugin, T: Model<P>>: Sized + 'static {
-    fn from_smooth_model(model: &T::Smooth) -> Self;
+pub trait UIModel: Sized + 'static {
+    fn update(&mut self);
 }

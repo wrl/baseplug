@@ -65,42 +65,49 @@ pub fn plugin_main<P: Plugin>(host_cb: HostCallbackProc, unique_id: &[u8; 4]) ->
         | (unique_id[1] as u32) << 16
         | (unique_id[2] as u32) << 8
         | (unique_id[3] as u32);
+    
+    let effect = AEffect {
+        magic: MAGIC,
 
-    let adapter = Box::new(VST2Adapter::<P> {
-        effect: AEffect {
-            magic: MAGIC,
+        dispatcher: dispatch::<P>,
+        process: process_deprecated,
+        set_parameter: set_parameter::<P>,
+        get_parameter: get_parameter::<P>,
 
-            dispatcher: dispatch::<P>,
-            process: process_deprecated,
-            set_parameter: set_parameter::<P>,
-            get_parameter: get_parameter::<P>,
+        num_programs: 0,
+        num_params: <P::Model as Model<P>>::Smooth::PARAMS.len() as i32,
+        num_inputs: P::INPUT_CHANNELS as i32,
+        num_outputs: P::OUTPUT_CHANNELS as i32,
 
-            num_programs: 0,
-            num_params: <P::Model as Model<P>>::Smooth::PARAMS.len() as i32,
-            num_inputs: P::INPUT_CHANNELS as i32,
-            num_outputs: P::OUTPUT_CHANNELS as i32,
+        flags,
 
-            flags: flags,
+        ptr_1: ptr::null_mut(),
+        ptr_2: ptr::null_mut(),
 
-            ptr_1: ptr::null_mut(),
-            ptr_2: ptr::null_mut(),
+        initial_delay: 0,
 
-            initial_delay: 0,
+        empty_2: [0; 8],
+        unknown_float: 0.0,
 
-            empty_2: [0; 8],
-            unknown_float: 0.0,
+        object: ptr::null_mut(),
+        user: ptr::null_mut(),
 
-            object: ptr::null_mut(),
-            user: ptr::null_mut(),
+        unique_id: unique_id as i32,
+        version: 0,
 
-            unique_id: unique_id as i32,
-            version: 0,
-
-            process_replacing: process_replacing::<P>,
-            process_double_replacing: process_replacing_f64,
-        },
-        
+        process_replacing: process_replacing::<P>,
+        process_double_replacing: process_replacing_f64,
+    };
+    
+    let host_callback = VST2HostCallback {
+        effect: std::ptr::null_mut() as *mut AEffect,
         host_cb,
+    };
+
+    let mut adapter = Box::new(VST2Adapter::<P> {
+        effect,
+
+        host_callback: Arc::new(host_callback),
 
         editor_rect: Rect {
             top: 0,
@@ -114,6 +121,13 @@ pub fn plugin_main<P: Plugin>(host_cb: HostCallbackProc, unique_id: &[u8; 4]) ->
 
         output_events_buffer: OutgoingEvents::new()
     });
+
+    // Make sure we have the correct pointer to the effect.
+    let host_callback = VST2HostCallback {
+        effect: &mut adapter.effect as *mut AEffect,
+        host_cb,
+    };
+    adapter.host_callback = Arc::new(host_callback);
 
     unsafe {
         &mut ((*Box::into_raw(adapter)).effect)

@@ -1,8 +1,11 @@
+use std::borrow::Borrow;
 use std::ffi::CStr;
 use std::os::raw::c_void;
 use std::ptr;
 use std::{io, os::raw::c_char};
 use std::{mem, slice};
+use std::sync::Arc;
+use std::cell::UnsafeCell;
 
 pub use vst2_sys;
 use vst2_sys::*;
@@ -94,7 +97,7 @@ impl OutgoingEvents {
 
 struct VST2Adapter<P: Plugin> {
     effect: AEffect,
-    host_cb: HostCallbackProc,
+    host_callback: Arc<VST2HostCallback>,
     wrapped: WrappedPlugin<P>,
 
     editor_rect: Rect,
@@ -268,7 +271,11 @@ impl<P: Plugin> VST2Adapter<P> {
             },
 
             effect_opcodes::EDIT_OPEN => {
-                let ui_shared_model = self.wrapped.get_new_ui_model();
+                let ui_host_callback = VST2UIHostCallback {
+                    host_cb: Arc::clone(&self.host_callback)
+                };
+
+                let ui_shared_model = self.wrapped.as_ui_model(Arc::new(ui_host_callback));
 
                 return match self.ui_open(ui_shared_model, ptr) {
                     Ok(_) => 1,
@@ -341,10 +348,13 @@ impl<P: Plugin> VST2Adapter<P> {
         let time_info = {
             let flags = time_info_flags::TEMPO_VALID | time_info_flags::PPQ_POS_VALID;
 
-            let vti = (self.host_cb)(&mut self.effect,
-                host_opcodes::GET_TIME, 0,
+            let vti = self.host_callback.send(
+                host_opcodes::GET_TIME,
+                0,
                 flags as isize,
-                ptr::null_mut(), 0.0);
+                ptr::null_mut(),
+                0.0
+            );
 
             match vti {
                 0 => return mtime,
@@ -444,9 +454,42 @@ impl<P: Plugin> VST2Adapter<P> {
             }
 
             // send to host
-            (self.host_cb)(&mut self.effect as *mut AEffect,
+            self.host_callback.send(
                 host_opcodes::PROCESS_EVENTS,
-                0, 0, &self.output_events_buffer as *const _ as *mut _, 0.0);
+                0,
+                0,
+                &self.output_events_buffer as *const _ as *mut _,
+                0.0
+            );
         }
+    }
+}
+
+struct VST2HostCallback {
+    effect: *mut AEffect,
+    host_cb: HostCallbackProc,
+}
+
+impl VST2HostCallback {
+    #[inline]
+    pub(crate) fn send(&self, a: i32, b: i32, c: isize, d: *mut c_void, e: f32) -> isize {
+        (self.host_cb)(self.effect, a, b, c, d, e)
+    }
+}
+
+struct VST2UIHostCallback {
+    host_cb: Arc<VST2HostCallback>,
+}
+
+unsafe impl Send for VST2UIHostCallback {}
+unsafe impl Sync for VST2UIHostCallback {}
+
+impl UIHostCallback for VST2UIHostCallback {
+    fn send_parameter_update(&self, param_idx: usize, normalized: f32) {
+        self.host_cb.send(host_opcodes::BEGIN_EDIT, param_idx as i32, 0, ptr::null_mut(), 0.0);
+
+        self.host_cb.send(host_opcodes::AUTOMATE, param_idx as i32, 0, ptr::null_mut(), normalized);
+
+        self.host_cb.send(host_opcodes::END_EDIT, param_idx as i32, 0, ptr::null_mut(), 0.0);
     }
 }

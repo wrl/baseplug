@@ -35,7 +35,7 @@ impl<P: Plugin> fmt::Debug for Data<P> {
             Data::Parameter { param, val } =>
                 f.debug_struct("Data::Parameter")
                     .field("param", &param)
-                    .field("val", &val)
+                    .field("value", &val)
                     .finish()
         }
     }
