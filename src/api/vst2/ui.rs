@@ -1,11 +1,9 @@
 use std::os::raw::c_void;
-use std::sync::Arc;
 
 use raw_window_handle::{RawWindowHandle, HasRawWindowHandle};
 
 
 use super::*;
-use crate::UIHostCallback;
 
 struct VST2WindowHandle(*mut c_void);
 

@@ -1,11 +1,9 @@
-use std::borrow::Borrow;
 use std::ffi::CStr;
 use std::os::raw::c_void;
 use std::ptr;
 use std::{io, os::raw::c_char};
 use std::{mem, slice};
 use std::sync::Arc;
-use std::cell::UnsafeCell;
 
 pub use vst2_sys;
 use vst2_sys::*;
