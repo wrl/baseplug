@@ -185,7 +185,8 @@ impl<P: Plugin> WrappedPlugin<P> {
     #[inline]
     pub(crate) fn process(&mut self, mut musical_time: MusicalTime,
         input: [&[f32]; 2], mut output: [&mut [f32]; 2],
-        mut nframes: usize)
+        mut nframes: usize,
+        poll_from_ui: bool)
     {
         let mut start = 0;
         let mut ev_idx = 0;
@@ -248,7 +249,7 @@ impl<P: Plugin> WrappedPlugin<P> {
                     musical_time: &musical_time
                 };
 
-                let proc_model = self.smoothed_model.process(block_frames, &mut self.plug);
+                let proc_model = self.smoothed_model.process(block_frames, &mut self.plug, poll_from_ui);
                 self.plug.process(&proc_model, &mut context);
             }
 

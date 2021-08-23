@@ -505,12 +505,29 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
             }
         });
 
+    let poll_and_process_statements = fields_base.iter()
+        .map(|FieldInfo { ident, wrapping, parameter_info, .. }| {
+            match wrapping {
+                Some(WrappingType::Smooth) | Some(WrappingType::Unsmoothed) => {
+                    if parameter_info.is_some() {
+                        Some(quote!(self.#ident.poll_and_process(nframes, plug)))
+                    } else {
+                        Some(quote!(self.#ident.process(nframes)))
+                    }
+                }
+                Some(WrappingType::Declick) => {
+                    Some(quote!(self.#ident.process(nframes)))
+                }
+                None => None
+            }
+        });
+
     let process_statements = fields_base.iter()
         .map(|FieldInfo { ident, wrapping, parameter_info, .. }| {
             match wrapping {
                 Some(WrappingType::Smooth) | Some(WrappingType::Unsmoothed) => {
                     if parameter_info.is_some() {
-                        Some(quote!(self.#ident.process(nframes, plug)))
+                        Some(quote!(self.#ident.process(nframes)))
                     } else {
                         Some(quote!(self.#ident.process(nframes)))
                     }
@@ -649,8 +666,12 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
                 }
             }
 
-            fn process<'proc>(&'proc mut self, nframes: usize, plug: &mut P) -> Self::Process<'proc> {
-                #( #process_statements ;)*
+            fn process<'proc>(&'proc mut self, nframes: usize, plug: &mut P, poll_from_ui: bool) -> Self::Process<'proc> {
+                if poll_from_ui {
+                    #( #poll_and_process_statements ;)*
+                } else {
+                    #( #process_statements ;)*
+                }
 
                 #proc_ident {
                     #( #get_process_fields ),*

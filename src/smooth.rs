@@ -259,7 +259,7 @@ impl SmoothFloatParam {
         self.smooth.update_status_with_epsilon(epsilon)
     }
 
-    pub fn process<P: Plugin>(&mut self, nframes: usize, plug: &mut P) {
+    pub fn poll_and_process<P: Plugin>(&mut self, nframes: usize, plug: &mut P) {
         // Check for updated value from UI.
         let dsp_value = self.shared_dsp_value.get();
         if self.dsp_value != dsp_value {
@@ -274,6 +274,11 @@ impl SmoothFloatParam {
             }
         }
 
+        self.process(nframes);
+    }
+
+    #[inline]
+    pub fn process(&mut self, nframes: usize) {
         self.smooth.process(nframes);
     }
 

@@ -396,7 +396,7 @@ impl<P: Plugin> VST2Adapter<P> {
         };
 
         let musical_time = self.get_musical_time();
-        self.wrapped.process(musical_time, input, output, nframes as usize);
+        self.wrapped.process(musical_time, input, output, nframes as usize, true);
 
         // write output_events in the buffer
         self.send_output_events();

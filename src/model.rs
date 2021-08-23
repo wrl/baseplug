@@ -25,7 +25,8 @@ pub trait SmoothModel<P: Plugin, T: Model<P>>: Sized + 'static {
     fn reset(&mut self, from: &T);
 
     fn current_value(&'_ mut self) -> Self::Process<'_>;
-    fn process(&'_ mut self, nframes: usize, plug: &mut P) -> Self::Process<'_>;
+
+    fn process(&'_ mut self, nframes: usize, plug: &mut P, poll_from_ui: bool) -> Self::Process<'_>;
 
     fn as_ui_model(&self, ui_host_callback: Arc<dyn UIHostCallback>) -> T::UI;
 }
