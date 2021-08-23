@@ -645,6 +645,7 @@ impl UIFloatParam {
         unit_value_to_normal(&self.param_type(), unit_value)
     }
 
+    #[inline]
     pub fn _poll_update(&mut self) {
         let dsp_value = self.shared_dsp_value.get();
         if self.dsp_value != dsp_value {
@@ -697,6 +698,7 @@ impl UIFloatEntry {
         self.did_change
     }
 
+    #[inline]
     pub fn _poll_update(&mut self) {
         let dsp_value = self.shared_dsp_value.get();
         if self.dsp_value != dsp_value {
