@@ -432,16 +432,18 @@ impl UnsmoothedFloatParam {
     }
 
     #[inline]
-    pub fn process<P: Plugin>(&mut self, _nframes: usize, plug: &mut P) {
-        // Check for updated value from UI.
-        let dsp_value = self.shared_dsp_value.get();
-        if self.dsp_value != dsp_value {
-            self.dsp_value = dsp_value;
+    pub fn process<P: Plugin>(&mut self, _nframes: usize, plug: &mut P, poll_from_ui: bool) {
+        if poll_from_ui {
+            // Check for updated value from UI.
+            let dsp_value = self.shared_dsp_value.get();
+            if self.dsp_value != dsp_value {
+                self.dsp_value = dsp_value;
 
-            // Don't mind me, just sprinkling in some casual generic monstrosities.
-            let param = <<P::Model as Model<P>>::Smooth as Parameters<P, <P::Model as Model<P>>::Smooth>>::PARAMS[self.param_info.idx];
-            if let Some(dsp_notify) = param.dsp_notify {
-                dsp_notify(plug);
+                // Don't mind me, just sprinkling in some casual generic monstrosities.
+                let param = <<P::Model as Model<P>>::Smooth as Parameters<P, <P::Model as Model<P>>::Smooth>>::PARAMS[self.param_info.idx];
+                if let Some(dsp_notify) = param.dsp_notify {
+                    dsp_notify(plug);
+                }
             }
         }
     }
