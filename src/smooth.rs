@@ -5,12 +5,12 @@ use std::sync::Arc;
 
 use num_traits::Float;
 
-use crate::{Parameters, Plugin, Model};
-use crate::{AtomicFloat, UIHostCallback};
 use crate::parameter::{
-    ParamInfo, Unit, Type, normal_to_unit_value, unit_value_to_normal,
-    unit_val_to_dsp_val, dsp_val_to_unit_val,
+    dsp_val_to_unit_val, normal_to_unit_value, unit_val_to_dsp_val, unit_value_to_normal,
+    ParamInfo, Type, Unit,
 };
+use crate::{AtomicFloat, UIHostCallback};
+use crate::{Model, Parameters, Plugin};
 
 const SETTLE: f32 = 0.00001f32;
 
@@ -18,7 +18,7 @@ const SETTLE: f32 = 0.00001f32;
 pub enum SmoothStatus {
     Inactive,
     Active,
-    Deactivating
+    Deactivating,
 }
 
 impl SmoothStatus {
@@ -30,7 +30,7 @@ impl SmoothStatus {
 
 pub struct SmoothOutput<'a, T> {
     pub values: &'a [T],
-    pub status: SmoothStatus
+    pub status: SmoothStatus,
 }
 
 impl<'a, T> SmoothOutput<'a, T> {
@@ -41,7 +41,8 @@ impl<'a, T> SmoothOutput<'a, T> {
 }
 
 impl<'a, T, I> ops::Index<I> for SmoothOutput<'a, T>
-    where I: slice::SliceIndex<[T]>
+where
+    I: slice::SliceIndex<[T]>,
 {
     type Output = I::Output;
 
@@ -59,11 +60,12 @@ pub struct Smooth<T: Float> {
 
     a: T,
     b: T,
-    last_output: T
+    last_output: T,
 }
 
 impl<T> Smooth<T>
-    where T: Float + fmt::Display
+where
+    T: Float + fmt::Display,
 {
     pub fn new(input: T) -> Self {
         Self {
@@ -73,12 +75,11 @@ impl<T> Smooth<T>
 
             a: T::one(),
             b: T::zero(),
-            last_output: input
+            last_output: input,
         }
     }
 
-    pub fn reset(&mut self, val: T)
-    {
+    pub fn reset(&mut self, val: T) {
         *self = Self {
             a: self.a,
             b: self.b,
@@ -101,7 +102,7 @@ impl<T> Smooth<T>
     pub fn output(&self) -> SmoothOutput<T> {
         SmoothOutput {
             values: &self.output,
-            status: self.status
+            status: self.status,
         }
     }
 
@@ -109,7 +110,7 @@ impl<T> Smooth<T>
     pub fn current_value(&self) -> SmoothOutput<T> {
         SmoothOutput {
             values: slice::from_ref(&self.last_output),
-            status: self.status
+            status: self.status,
         }
     }
 
@@ -122,12 +123,11 @@ impl<T> Smooth<T>
                     self.reset(self.input);
                     self.status = SmoothStatus::Deactivating;
                 }
-            },
+            }
 
-            SmoothStatus::Deactivating =>
-                self.status = SmoothStatus::Inactive,
+            SmoothStatus::Deactivating => self.status = SmoothStatus::Inactive,
 
-            _ => ()
+            _ => (),
         };
 
         self.status
@@ -135,7 +135,7 @@ impl<T> Smooth<T>
 
     pub fn process(&mut self, nframes: usize) {
         if self.status != SmoothStatus::Active {
-            return
+            return;
         }
 
         let nframes = nframes.min(crate::MAX_BLOCKSIZE);
@@ -169,7 +169,8 @@ impl Smooth<f32> {
 }
 
 impl<T> From<T> for Smooth<T>
-    where T: Float + fmt::Display
+where
+    T: Float + fmt::Display,
 {
     fn from(val: T) -> Self {
         Self::new(val)
@@ -177,8 +178,9 @@ impl<T> From<T> for Smooth<T>
 }
 
 impl<T, I> ops::Index<I> for Smooth<T>
-    where I: slice::SliceIndex<[T]>,
-          T: Float
+where
+    I: slice::SliceIndex<[T]>,
+    T: Float,
 {
     type Output = I::Output;
 
@@ -189,7 +191,8 @@ impl<T, I> ops::Index<I> for Smooth<T>
 }
 
 impl<T> fmt::Debug for Smooth<T>
-    where T: Float + fmt::Debug
+where
+    T: Float + fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct(concat!("Smooth<", stringify!(T), ">"))
@@ -211,10 +214,7 @@ pub struct SmoothFloatParam {
 }
 
 impl SmoothFloatParam {
-    pub fn new(
-        dsp_value: f32,
-        param_info: &'static ParamInfo,
-    ) -> Self {
+    pub fn new(dsp_value: f32, param_info: &'static ParamInfo) -> Self {
         Self {
             smooth: Smooth::new(dsp_value),
             shared_dsp_value: Arc::new(AtomicFloat::new(dsp_value)),
@@ -270,7 +270,10 @@ impl SmoothFloatParam {
                 self.smooth.set(dsp_value);
 
                 // Don't mind me, just sprinkling in some casual generic monstrosities.
-                let param = <<P::Model as Model<P>>::Smooth as Parameters<P, <P::Model as Model<P>>::Smooth>>::PARAMS[self.param_info.idx];
+                let param = <<P::Model as Model<P>>::Smooth as Parameters<
+                    P,
+                    <P::Model as Model<P>>::Smooth,
+                >>::PARAMS[self.param_info.idx];
                 if let Some(dsp_notify) = param.dsp_notify {
                     dsp_notify(plug);
                 }
@@ -313,9 +316,7 @@ pub struct SmoothFloatEntry {
 }
 
 impl SmoothFloatEntry {
-    pub fn new(
-        dsp_value: f32,
-    ) -> Self {
+    pub fn new(dsp_value: f32) -> Self {
         Self {
             smooth: Smooth::new(dsp_value),
             shared_dsp_value: Arc::new(AtomicFloat::new(dsp_value)),
@@ -389,9 +390,7 @@ impl SmoothFloatEntry {
 
     #[inline]
     pub fn get_ui_entry(&self) -> UIFloatEntry {
-        UIFloatEntry::new(
-            Arc::clone(&self.shared_dsp_value),
-        )
+        UIFloatEntry::new(Arc::clone(&self.shared_dsp_value))
     }
 }
 
@@ -403,10 +402,7 @@ pub struct UnsmoothedFloatParam {
 }
 
 impl UnsmoothedFloatParam {
-    pub fn new(
-        dsp_value: f32,
-        param_info: &'static ParamInfo,
-    ) -> Self {
+    pub fn new(dsp_value: f32, param_info: &'static ParamInfo) -> Self {
         Self {
             shared_dsp_value: Arc::new(AtomicFloat::new(dsp_value)),
             dsp_value,
@@ -440,7 +436,10 @@ impl UnsmoothedFloatParam {
                 self.dsp_value = dsp_value;
 
                 // Don't mind me, just sprinkling in some casual generic monstrosities.
-                let param = <<P::Model as Model<P>>::Smooth as Parameters<P, <P::Model as Model<P>>::Smooth>>::PARAMS[self.param_info.idx];
+                let param = <<P::Model as Model<P>>::Smooth as Parameters<
+                    P,
+                    <P::Model as Model<P>>::Smooth,
+                >>::PARAMS[self.param_info.idx];
                 if let Some(dsp_notify) = param.dsp_notify {
                     dsp_notify(plug);
                 }
@@ -464,9 +463,7 @@ pub struct UnsmoothedFloatEntry {
 }
 
 impl UnsmoothedFloatEntry {
-    pub fn new(
-        dsp_value: f32,
-    ) -> Self {
+    pub fn new(dsp_value: f32) -> Self {
         Self {
             shared_dsp_value: Arc::new(AtomicFloat::new(dsp_value)),
             dsp_value,
@@ -501,9 +498,7 @@ impl UnsmoothedFloatEntry {
 
     #[inline]
     pub fn get_ui_entry(&self) -> UIFloatEntry {
-        UIFloatEntry::new(
-            Arc::clone(&self.shared_dsp_value),
-        )
+        UIFloatEntry::new(Arc::clone(&self.shared_dsp_value))
     }
 }
 
@@ -547,16 +542,14 @@ impl UIFloatParam {
             // Make sure that `normalized` is withing range.
             self.normalized = normalized.clamp(0.0, 1.0);
 
-            self.unit_value = normal_to_unit_value(
-                &self.param_info.param_type,
-                self.normalized
-            );
+            self.unit_value = normal_to_unit_value(&self.param_info.param_type, self.normalized);
             self.dsp_value = unit_val_to_dsp_val(self.param_info.unit, self.unit_value);
 
             self.shared_dsp_value.set(self.dsp_value);
             self.did_change = true;
 
-            self.ui_host_callback.send_parameter_update(self.param_info.idx, self.normalized);
+            self.ui_host_callback
+                .send_parameter_update(self.param_info.idx, self.normalized);
         }
     }
 
@@ -571,14 +564,15 @@ impl UIFloatParam {
             self.shared_dsp_value.set(self.dsp_value);
             self.did_change = true;
 
-            self.ui_host_callback.send_parameter_update(self.param_info.idx, self.normalized);
+            self.ui_host_callback
+                .send_parameter_update(self.param_info.idx, self.normalized);
         }
     }
 
     #[inline]
     pub fn clamp_value(&self, unit_value: f32) -> f32 {
         let (min, max) = match &self.param_info.param_type {
-            Type::Numeric { min, max, .. } => (min, max)
+            Type::Numeric { min, max, .. } => (min, max),
         };
         unit_value.clamp(*min, *max)
     }
@@ -586,6 +580,11 @@ impl UIFloatParam {
     #[inline]
     pub fn normalized(&self) -> f32 {
         self.normalized
+    }
+
+    #[inline]
+    pub fn dsp_value(&self) -> f32 {
+        self.dsp_value
     }
 
     #[inline]
@@ -626,7 +625,7 @@ impl UIFloatParam {
     #[inline]
     pub fn min_max(&self) -> (f32, f32) {
         match &self.param_info.param_type {
-            Type::Numeric { min, max, .. } => (*min, *max)
+            Type::Numeric { min, max, .. } => (*min, *max),
         }
     }
 
@@ -669,9 +668,7 @@ pub struct UIFloatEntry {
 }
 
 impl UIFloatEntry {
-    fn new(
-        shared_dsp_value: Arc<AtomicFloat>,
-    ) -> Self {
+    fn new(shared_dsp_value: Arc<AtomicFloat>) -> Self {
         let dsp_value = shared_dsp_value.get();
 
         Self {
