@@ -29,6 +29,8 @@ pub use model::*;
 
 pub mod parameter;
 pub use parameter::Param;
+pub use parameter::Translatable;
+pub use parameter::TranslateFrom;
 
 mod plugin;
 pub use plugin::*;

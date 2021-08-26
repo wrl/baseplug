@@ -308,6 +308,18 @@ impl<'a> FieldInfo<'a> {
 }
 
 pub(crate) fn derive(input: DeriveInput) -> TokenStream {
+    match &input.data {
+        syn::Data::Struct(_) => {
+            struct_derive(input)
+        },
+        syn::Data::Enum(_) => {
+            enum_derive(input)
+        },
+        _ => panic!("derive")
+    }    
+}
+
+fn struct_derive(input: DeriveInput) -> TokenStream {
     let attrs = &input.attrs;
     let model_vis = &input.vis;
     let model_name = &input.ident;
@@ -556,4 +568,75 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
             }
         };
     )
+}
+
+fn enum_derive(input: DeriveInput) -> TokenStream {
+    let attrs = &input.attrs;
+    let model_vis = &input.vis;
+    let model_name = &input.ident;
+    let data = &input.data;
+
+    let variant_names = match data {
+        Data::Enum(data_enum) => {
+            data_enum.variants.iter().map(|v| &v.ident)
+        },
+
+        _ => panic!()
+    };
+
+    let variant_count = match data {
+        Data::Enum(data_enum) => {
+            data_enum.variants.iter().count()
+        },
+
+        _ => panic!()
+    };
+
+    let variant_names_display = variant_names.clone();
+    let variant_names_string = variant_names.clone().map(|x| x.to_string());
+
+    let variant_names_xlate_in = variant_names.clone();
+    let mut variant_index_xlate_in = Vec::new();
+    for i in 1..variant_count + 1 {
+        variant_index_xlate_in.push(i as f32);
+    }
+
+    let variant_names_xlate_out = variant_names.clone();
+    let mut variant_index_xlate_out = Vec::new();
+    for i in 1..variant_count + 1 {
+        variant_index_xlate_out.push(i as f32);
+    }
+
+    quote!(
+        #( #attrs )*
+        #model_vis enum #model_name {
+            #( #variant_names ),*
+        }
+
+        #[doc(hidden)]
+        impl std::fmt::Display for #model_name {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                match *self {
+                    #(#model_name::#variant_names_display => write!(f, #variant_names_string)),*
+                }
+            }
+        }
+
+        #[doc(hidden)]
+        impl<P: Plugin, Model> Translatable<#model_name, P, Model> for #model_name {
+            fn xlate_in(param: &Param<P, Model>, normalised: f32) -> #model_name {
+                let normalised = normalised.min(1.0).max(0.0);
+                match normalised {
+                    #(n if n <= #variant_index_xlate_in / #variant_count as f32 => #model_name::#variant_names_xlate_in,)*
+                    _ => unreachable!(),
+                }
+            }
+        
+            fn xlate_out(&self, param: &Param<P, Model>) -> f32 {
+                match &self {
+                    #(#model_name::#variant_names_xlate_out => #variant_index_xlate_out / #variant_count as f32,)*
+                }
+            }
+        }     
+    )   
 }
