@@ -14,14 +14,8 @@ pub use atomic_float::AtomicFloat;
 mod smooth;
 pub use smooth::{
     Smooth,
-    SmoothFloatParam,
-    SmoothFloatEntry,
-    UnsmoothedFloatParam,
-    UnsmoothedFloatEntry,
     SmoothOutput,
     SmoothStatus,
-    UIFloatParam,
-    UIFloatEntry,
 };
 
 mod declick;
@@ -32,6 +26,16 @@ pub use declick::{
 
 pub mod event;
 pub use event::Event;
+
+mod float_param;
+pub use float_param::{
+    SmoothFloatParam,
+    SmoothFloatEntry,
+    UnsmoothedFloatParam,
+    UnsmoothedFloatEntry,
+    UIFloatParam,
+    UIFloatEntry,
+};
 
 mod model;
 pub use model::*;
