@@ -588,7 +588,7 @@ impl UIFloatParam {
     }
 
     #[inline]
-    pub fn value(&self) -> f32 {
+    pub fn unit_value(&self) -> f32 {
         self.unit_value
     }
 
