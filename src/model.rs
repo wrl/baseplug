@@ -1,13 +1,12 @@
 use crate::*;
-use crate::wrapper::UIHostCallback;
-use std::sync::Arc;
 
 pub trait Model<P: Plugin>: Sized + Default + 'static {
     type Smooth:
         SmoothModel<P, Self>
-        + Parameters<P, Self::Smooth>;
+        + Parameters<P, Self::Smooth, Self::UI>;
     
-    type UI: UIModel;
+    type UI:
+        UIModel<P, Self>;
 }
 
 pub trait SmoothModel<P: Plugin, T: Model<P>>: Sized + 'static {
@@ -26,11 +25,22 @@ pub trait SmoothModel<P: Plugin, T: Model<P>>: Sized + 'static {
 
     fn current_value(&'_ mut self) -> Self::Process<'_>;
 
-    fn process(&'_ mut self, nframes: usize, plug: &mut P, poll_from_ui: bool) -> Self::Process<'_>;
-
-    fn as_ui_model(&self, ui_host_callback: Arc<dyn UIHostCallback>) -> T::UI;
+    fn process(&'_ mut self, nframes: usize) -> Self::Process<'_>;
 }
 
-pub trait UIModel: Sized + 'static {
-    fn update(&mut self);
+pub trait UIModel<P: Plugin, T: Model<P>>: Sized + 'static {
+    /// Poll for updates from the host. This should be called periodically, typically
+    /// at the top of each render frame.
+    fn poll_updates(&mut self);
+
+    /// Returns true if the host loaded a new program (preset).
+    fn new_program_loaded(&self) -> bool;
+
+    /// Returns true if the host has requested that the UI should close.
+    fn close_requested(&self) -> bool;
+
+    fn from_model(
+        model: T,
+        plug_msg_handles: PlugMsgHandles<T, T::Smooth>,
+    ) -> Self;
 }

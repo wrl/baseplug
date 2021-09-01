@@ -10,7 +10,7 @@ const SETTLE: f32 = 0.00001f32;
 pub enum SmoothStatus {
     Inactive,
     Active,
-    Deactivating,
+    Deactivating
 }
 
 impl SmoothStatus {
@@ -22,7 +22,7 @@ impl SmoothStatus {
 
 pub struct SmoothOutput<'a, T> {
     pub values: &'a [T],
-    pub status: SmoothStatus,
+    pub status: SmoothStatus
 }
 
 impl<'a, T> SmoothOutput<'a, T> {
@@ -33,8 +33,7 @@ impl<'a, T> SmoothOutput<'a, T> {
 }
 
 impl<'a, T, I> ops::Index<I> for SmoothOutput<'a, T>
-where
-    I: slice::SliceIndex<[T]>,
+    where I: slice::SliceIndex<[T]>
 {
     type Output = I::Output;
 
@@ -52,12 +51,11 @@ pub struct Smooth<T: Float> {
 
     a: T,
     b: T,
-    last_output: T,
+    last_output: T
 }
 
 impl<T> Smooth<T>
-where
-    T: Float + fmt::Display,
+    where T: Float + fmt::Display
 {
     pub fn new(input: T) -> Self {
         Self {
@@ -67,11 +65,12 @@ where
 
             a: T::one(),
             b: T::zero(),
-            last_output: input,
+            last_output: input
         }
     }
 
-    pub fn reset(&mut self, val: T) {
+    pub fn reset(&mut self, val: T)
+    {
         *self = Self {
             a: self.a,
             b: self.b,
@@ -94,7 +93,7 @@ where
     pub fn output(&self) -> SmoothOutput<T> {
         SmoothOutput {
             values: &self.output,
-            status: self.status,
+            status: self.status
         }
     }
 
@@ -102,7 +101,7 @@ where
     pub fn current_value(&self) -> SmoothOutput<T> {
         SmoothOutput {
             values: slice::from_ref(&self.last_output),
-            status: self.status,
+            status: self.status
         }
     }
 
@@ -115,11 +114,12 @@ where
                     self.reset(self.input);
                     self.status = SmoothStatus::Deactivating;
                 }
-            }
+            },
 
-            SmoothStatus::Deactivating => self.status = SmoothStatus::Inactive,
+            SmoothStatus::Deactivating =>
+                self.status = SmoothStatus::Inactive,
 
-            _ => (),
+            _ => ()
         };
 
         self.status
@@ -127,7 +127,7 @@ where
 
     pub fn process(&mut self, nframes: usize) {
         if self.status != SmoothStatus::Active {
-            return;
+            return
         }
 
         let nframes = nframes.min(crate::MAX_BLOCKSIZE);
@@ -161,8 +161,7 @@ impl Smooth<f32> {
 }
 
 impl<T> From<T> for Smooth<T>
-where
-    T: Float + fmt::Display,
+    where T: Float + fmt::Display
 {
     fn from(val: T) -> Self {
         Self::new(val)
@@ -170,9 +169,8 @@ where
 }
 
 impl<T, I> ops::Index<I> for Smooth<T>
-where
-    I: slice::SliceIndex<[T]>,
-    T: Float,
+    where I: slice::SliceIndex<[T]>,
+          T: Float
 {
     type Output = I::Output;
 
@@ -183,8 +181,7 @@ where
 }
 
 impl<T> fmt::Debug for Smooth<T>
-where
-    T: Float + fmt::Debug,
+    where T: Float + fmt::Debug
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct(concat!("Smooth<", stringify!(T), ">"))

@@ -92,16 +92,37 @@ impl<P: PluginUI> VST2UI for VST2Adapter<P> {
         let parent = VST2WindowHandle(parent);
 
         if self.wrapped.ui_handle.is_none() {
-            P::ui_open(&parent, model)
-                .map(|handle| self.wrapped.ui_handle = Some(handle))
+            match P::ui_open(&parent, model) {
+                WindowOpenResult::Ok(handle) => {
+                    self.wrapped.ui_handle = Some(handle);
+                    WindowOpenResult::Ok(())
+                }
+                WindowOpenResult::Err(_) => {
+                    self.wrapped.ui_msg_handles = None;
+                    WindowOpenResult::Err(())
+                }
+            }
         } else {
             Ok(())
         }
     }
 
     fn ui_close(&mut self) {
+        if let Some(mut ui_msg_handles) = self.wrapped.ui_msg_handles.take() {
+            // We can send a message directly to the UI Model if the user wants
+            // to handle it that way. This should also take care of making sure the UI Model
+            // stops using the host callback between the time it receives the close signal and
+            // the UI actually closes.
+            if let Err(_) = ui_msg_handles.plug_to_ui_tx.push(PlugToUIMsg::ShouldClose) {
+                eprintln!("Plug to UI message buffer is full!");
+            }
+        }
+
         if let Some(handle) = self.wrapped.ui_handle.take() {
-            P::ui_close(handle)
+            // Tell the window handle to close. Ideally the window handle should automatically
+            // alert the UI that it will close and close it gracefully, so as to avoid relying
+            // on the user to remember.
+            P::ui_close(handle);
         }
     }
 }

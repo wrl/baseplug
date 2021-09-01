@@ -10,8 +10,9 @@ pub enum Data<P: Plugin> {
     Midi([u8; 3]),
 
     Parameter {
-        param: &'static Param<P, <P::Model as Model<P>>::Smooth>,
-        val: f32
+        param: &'static Param<P, <P::Model as Model<P>>::Smooth, <P::Model as Model<P>>::UI>,
+        val: f32,
+        notify_ui: bool,
     }
 }
 
@@ -32,10 +33,11 @@ impl<P: Plugin> fmt::Debug for Data<P> {
                     .field(&m)
                     .finish(),
 
-            Data::Parameter { param, val } =>
+            Data::Parameter { param, val, notify_ui } =>
                 f.debug_struct("Data::Parameter")
                     .field("param", &param)
                     .field("value", &val)
+                    .field("notify_ui", &notify_ui)
                     .finish()
         }
     }

@@ -27,16 +27,6 @@ pub use declick::{
 pub mod event;
 pub use event::Event;
 
-mod float_param;
-pub use float_param::{
-    SmoothFloatParam,
-    SmoothFloatEntry,
-    UnsmoothedFloatParam,
-    UnsmoothedFloatEntry,
-    UIFloatParam,
-    UIFloatEntry,
-};
-
 mod model;
 pub use model::*;
 
@@ -49,8 +39,11 @@ pub use plugin::*;
 mod time;
 pub use time::*;
 
+mod ui_param;
+pub use ui_param::{UIFloatParam, UIFloatValue};
+
 mod wrapper;
-pub use wrapper::UIHostCallback;
+pub use wrapper::{UIHostCallback, PlugToUIMsg, UIToPlugMsg, PlugMsgHandles};
 
 pub use baseplug_derive::model;
 

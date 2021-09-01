@@ -107,7 +107,7 @@ pub fn plugin_main<P: Plugin>(host_cb: HostCallbackProc, unique_id: &[u8; 4]) ->
     let mut adapter = Box::new(VST2Adapter::<P> {
         effect,
 
-        host_callback: Arc::new(host_callback),
+        host_callback,
 
         editor_rect: Rect {
             top: 0,
@@ -127,7 +127,7 @@ pub fn plugin_main<P: Plugin>(host_cb: HostCallbackProc, unique_id: &[u8; 4]) ->
         effect: &mut adapter.effect as *mut AEffect,
         host_cb,
     };
-    adapter.host_callback = Arc::new(host_callback);
+    adapter.host_callback = host_callback;
 
     unsafe {
         &mut ((*Box::into_raw(adapter)).effect)

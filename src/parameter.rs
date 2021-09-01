@@ -30,8 +30,8 @@ pub enum Unit {
     Decibels
 }
 
-pub struct Format<P: Plugin, Model> {
-    pub display_cb: fn(&Param<P, Model>, &Model, &mut dyn io::Write) -> io::Result<()>,
+pub struct Format<P: Plugin, SmoothModel, UIModel> {
+    pub display_cb: fn(&Param<P, SmoothModel, UIModel>, &SmoothModel, &mut dyn io::Write) -> io::Result<()>,
     pub label: &'static str
 }
 
@@ -54,25 +54,27 @@ impl ParamInfo {
     }
 }
 
-pub struct Param<P: Plugin, Model> {
+pub struct Param<P: Plugin, SmoothModel, UIModel> {
     pub info: ParamInfo,
 
-    pub format: Format<P, Model>,
+    pub format: Format<P, SmoothModel, UIModel>,
 
     pub dsp_notify: Option<fn(&mut P)>,
 
-    pub set_cb: fn(&Param<P, Model>, &mut Model, f32),
-    pub get_cb: fn(&Param<P, Model>, &Model) -> f32,
+    pub set_cb: fn(&Param<P, SmoothModel, UIModel>, &mut SmoothModel, f32),
+    pub get_cb: fn(&Param<P, SmoothModel, UIModel>, &SmoothModel) -> f32,
+
+    pub set_ui_cb: fn(&mut UIModel, f32),
 }
 
-impl<P: Plugin, Model> Param<P, Model> {
+impl<P: Plugin, SmoothModel, UIModel> Param<P, SmoothModel, UIModel> {
     #[inline]
-    pub fn set(&self, model: &mut Model, val: f32) {
+    pub fn set(&self, model: &mut SmoothModel, val: f32) {
         (self.set_cb)(self, model, val)
     }
 
     #[inline]
-    pub fn get(&self, model: &Model) -> f32 {
+    pub fn get(&self, model: &SmoothModel) -> f32 {
         (self.get_cb)(self, model)
     }
 
@@ -87,12 +89,17 @@ impl<P: Plugin, Model> Param<P, Model> {
     }
 
     #[inline]
-    pub fn get_display(&self, model: &Model, w: &mut dyn io::Write) -> io::Result<()> {
+    pub fn get_display(&self, model: &SmoothModel, w: &mut dyn io::Write) -> io::Result<()> {
         (self.format.display_cb)(self, model, w)
+    }
+
+    #[inline]
+    pub fn set_ui(&self, model: &mut UIModel, val: f32) {
+        (self.set_ui_cb)(model, val)
     }
 }
 
-impl<P: Plugin, Model> fmt::Debug for Param<P, Model> {
+impl<P: Plugin, SmoothModel, UIModel> fmt::Debug for Param<P, SmoothModel, UIModel> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Param")
             .field("name", &self.info.name)
@@ -103,34 +110,34 @@ impl<P: Plugin, Model> fmt::Debug for Param<P, Model> {
     }
 }
 
-pub trait Translatable<T, P: Plugin, Model> {
-    fn xlate_in(param: &Param<P, Model>, normalized: f32) -> T;
-    fn xlate_out(&self, param: &Param<P, Model>) -> f32;
+pub trait Translatable<T, P: Plugin, SmoothModel, UIModel> {
+    fn xlate_in(param: &Param<P, SmoothModel, UIModel>, normalized: f32) -> T;
+    fn xlate_out(&self, param: &Param<P, SmoothModel, UIModel>) -> f32;
 }
 
-impl<P: Plugin, Model> Translatable<f32, P, Model> for f32 {
+impl<P: Plugin, SmoothModel, UIModel> Translatable<f32, P, SmoothModel, UIModel> for f32 {
     #[inline]
-    fn xlate_in(param: &Param<P, Model>, normalized: f32) -> f32 {
+    fn xlate_in(param: &Param<P, SmoothModel, UIModel>, normalized: f32) -> f32 {
         normal_to_dsp_val(param.info.unit, &param.info.param_type, normalized)
     }
 
     #[inline]
-    fn xlate_out(&self, param: &Param<P, Model>) -> f32 {
+    fn xlate_out(&self, param: &Param<P, SmoothModel, UIModel>) -> f32 {
         dsp_val_to_normal(param.info.unit, &param.info.param_type, *self)
     }
 }
 
-pub trait TranslateFrom<F, T, P: Plugin, Model>
-    where T: Translatable<T, P, Model>
+pub trait TranslateFrom<F, T, P: Plugin, SmoothModel, UIModel>
+    where T: Translatable<T, P, SmoothModel, UIModel>
 {
-    fn xlate_from(self, param: &Param<P, Model>) -> T;
+    fn xlate_from(self, param: &Param<P, SmoothModel, UIModel>) -> T;
 }
 
-impl<T, P: Plugin, Model> TranslateFrom<f32, T, P, Model> for f32
-    where T: Translatable<T, P, Model>
+impl<T, P: Plugin, SmoothModel, UIModel> TranslateFrom<f32, T, P, SmoothModel, UIModel> for f32
+    where T: Translatable<T, P, SmoothModel, UIModel>
 {
     #[inline]
-    fn xlate_from(self, param: &Param<P, Model>) -> T {
+    fn xlate_from(self, param: &Param<P, SmoothModel, UIModel>) -> T {
         T::xlate_in(param, self)
     }
 }

@@ -34,8 +34,8 @@ pub struct ProcessContext<'a, 'b, P: Plugin> {
     pub musical_time: &'a MusicalTime
 }
 
-pub trait Parameters<P: Plugin, Model: 'static> {
-    const PARAMS: &'static [&'static Param<P, Model>];
+pub trait Parameters<P: Plugin, SmoothModel: 'static, UIModel: 'static> {
+    const PARAMS: &'static [&'static Param<P, SmoothModel, UIModel>];
 }
 
 macro_rules! proc_model {

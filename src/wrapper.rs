@@ -1,25 +1,72 @@
-use std::sync::Arc;
+use std::cell::UnsafeCell;
+use ringbuf::{RingBuffer, Producer, Consumer};
 
-use crate::{
-    Model,
-    SmoothModel,
-
-    Plugin,
-    PluginUI,
-    MidiReceiver,
-    Param,
-
-    AudioBus,
-    AudioBusMut,
-    ProcessContext,
-    MusicalTime,
-
-    Event,
-    event
-};
+use crate::{AudioBus, AudioBusMut, Event, MidiReceiver, Model, MusicalTime, Param, Parameters, Plugin, PluginUI, ProcessContext, SmoothModel, event};
 
 pub trait UIHostCallback: Send + Sync {
     fn send_parameter_update(&self, param_idx: usize, normalized: f32);
+
+    // Called when the UI Model received the `ShouldClose` message.
+    fn close_msg_received(&self);
+}
+
+pub enum PlugToUIMsg<Model: 'static> {
+    ParamChanged {
+        // Sending parameter by index because I cannot for the life of me figure out how to make
+        // the rust compiler happy with all the generics.
+        param_idx: usize,
+        normalized: f32,
+    },
+    ProgramChanged(Box<Model>),
+    ShouldClose,
+}
+
+pub enum UIToPlugMsg<SmoothModel: 'static> {
+    ParamChanged {
+        // Sending parameter by index because I cannot for the life of me figure out how to make
+        // the rust compiler happy with all the generics.
+        param_idx: usize,
+        normalized: f32,
+    },
+    ValueChanged {
+        // Holy crap this actually works.
+        cb: &'static fn(&mut SmoothModel, f32),
+        value: f32,
+    },
+    Closed
+}
+
+pub(crate) struct UIMsgHandles<P: Plugin> {
+    pub plug_to_ui_tx: Producer<PlugToUIMsg<P::Model>>,
+    pub ui_to_plug_rx: Consumer<UIToPlugMsg<<P::Model as Model<P>>::Smooth>>,
+}
+
+pub struct PlugMsgHandles<Model: 'static, SmoothModel: 'static> {
+    pub ui_host_cb: Box<dyn UIHostCallback>,
+    pub notify_dsp: bool,
+
+    plug_to_ui_rx: UnsafeCell<Consumer<PlugToUIMsg<Model>>>,
+    ui_to_plug_tx: UnsafeCell<Producer<UIToPlugMsg<SmoothModel>>>,
+}
+
+impl<Model: 'static, SmoothModel: 'static> PlugMsgHandles<Model, SmoothModel> {
+    pub fn pop_msg(&self) -> Option<PlugToUIMsg<Model>> {
+        // Safe because this is only place this is borrowed, and this is just a message queue.
+        unsafe { (&mut *self.plug_to_ui_rx.get()).pop() }
+    }
+
+    pub fn push_msg(&self, msg: UIToPlugMsg<SmoothModel>) -> Result<(), UIToPlugMsg<SmoothModel>> {
+        // Safe because this is only place this is borrowed, and this is just a message queue.
+        unsafe { (&mut *self.ui_to_plug_tx.get()).push(msg) }
+    }
+}
+
+impl<Model: 'static, SmoothModel: 'static> Drop for PlugMsgHandles<Model, SmoothModel> {
+    fn drop(&mut self) {
+        if let Err(_) = self.push_msg(UIToPlugMsg::Closed) {
+            eprintln!("UI to Plug message buffer is full!");
+        }
+    }
 }
 
 pub(crate) struct WrappedPlugin<P: Plugin> {
@@ -43,7 +90,8 @@ pub(crate) struct WrappedPlugin<P: Plugin> {
     pub(crate) smoothed_model: <P::Model as Model<P>>::Smooth,
     sample_rate: f32,
 
-    pub(crate) ui_handle: Option<<Self as WrappedPluginUI<P>>::UIHandle>
+    pub(crate) ui_handle: Option<<Self as WrappedPluginUI<P>>::UIHandle>,
+    pub(crate) ui_msg_handles: Option<UIMsgHandles<P>>,
 }
 
 impl<P: Plugin> WrappedPlugin<P> {
@@ -56,7 +104,8 @@ impl<P: Plugin> WrappedPlugin<P> {
             smoothed_model: <P::Model as Model<P>>::Smooth::from_model(P::Model::default()),
             sample_rate: 0.0,
 
-            ui_handle: None
+            ui_handle: None,
+            ui_msg_handles: None,
         }
     }
 
@@ -77,6 +126,12 @@ impl<P: Plugin> WrappedPlugin<P> {
         let model = self.smoothed_model.as_model();
         self.plug = P::new(self.sample_rate, &model);
         self.smoothed_model.reset(&model);
+
+        if let Some(ui_msg_handles) = &mut self.ui_msg_handles {
+            if let Err(_) = ui_msg_handles.plug_to_ui_tx.push(PlugToUIMsg::ProgramChanged(Box::new(model))) {
+                eprintln!("Plug to UI message buffer is full!");
+            }
+        }
     }
 
     ////
@@ -84,30 +139,49 @@ impl<P: Plugin> WrappedPlugin<P> {
     ////
 
     #[inline]
-    pub(crate) fn get_parameter(&self, param: &Param<P, <P::Model as Model<P>>::Smooth>) -> f32 {
+    pub(crate) fn get_parameter(&self, param: &Param<P, <P::Model as Model<P>>::Smooth, <P::Model as Model<P>>::UI>) -> f32 {
         param.get(&self.smoothed_model)
     }
 
     #[inline]
-    pub(crate) fn set_parameter(&mut self, param: &'static Param<P, <P::Model as Model<P>>::Smooth>, val: f32) {
+    pub(crate) fn set_parameter(&mut self, param: &'static Param<P, <P::Model as Model<P>>::Smooth, <P::Model as Model<P>>::UI>, val: f32) {
         if param.dsp_notify.is_some() {
             self.enqueue_event(Event {
                 frame: 0,
                 data: event::Data::Parameter {
                     param,
                     val,
+                    notify_ui: true,  // Notify the UI that the host changed this value.
                 }
             });
         } else {
             param.set(&mut self.smoothed_model, val);
+
+            self.notify_ui_of_param_change(param, val);
         }
     }
 
-    fn set_parameter_from_event(&mut self, param: &Param<P, <P::Model as Model<P>>::Smooth>, val: f32) {
+    fn set_parameter_from_event(&mut self, param: &'static Param<P, <P::Model as Model<P>>::Smooth, <P::Model as Model<P>>::UI>, val: f32, notify_ui: bool) {
         param.set(&mut self.smoothed_model, val);
 
         if let Some(dsp_notify) = param.dsp_notify {
             dsp_notify(&mut self.plug);
+        }
+        
+        // Do not notify UI if this parameter change originated from the UI itself.
+        if notify_ui {
+            self.notify_ui_of_param_change(param, val);
+        }
+    }
+
+    fn notify_ui_of_param_change(&mut self, param: &'static Param<P, <P::Model as Model<P>>::Smooth, <P::Model as Model<P>>::UI>, val: f32) {
+        if let Some(ui_msg_handles) = &mut self.ui_msg_handles {
+            if let Err(_) = ui_msg_handles.plug_to_ui_tx.push(PlugToUIMsg::ParamChanged {
+                param_idx: param.info.idx,
+                normalized: val,
+            }) {
+                eprintln!("Plug to UI message buffer is full!");
+            }
         }
     }
 
@@ -133,8 +207,31 @@ impl<P: Plugin> WrappedPlugin<P> {
         self.smoothed_model.set(&m);
     }
 
-    pub(crate) fn as_ui_model(&self, ui_host_callback: Arc<dyn UIHostCallback>) -> <P::Model as Model<P>>::UI {
-        <<P::Model as Model<P>>::Smooth as SmoothModel<P, P::Model>>::as_ui_model(&self.smoothed_model, ui_host_callback)
+    pub(crate) fn as_ui_model(&mut self, ui_host_callback: Box<dyn UIHostCallback>, notify_dsp: bool) -> <P::Model as Model<P>>::UI {
+        use crate::UIModel;
+
+        // TODO: Set capacity based on number of parameters.
+        let (plug_to_ui_tx, plug_to_ui_rx) = RingBuffer::<PlugToUIMsg<P::Model>>::new(512).split();
+        let (ui_to_plug_tx, ui_to_plug_rx) = RingBuffer::<UIToPlugMsg<<P::Model as Model<P>>::Smooth>>::new(512).split();
+
+        self.ui_msg_handles = Some(UIMsgHandles {
+            plug_to_ui_tx,
+            ui_to_plug_rx,
+        });
+
+        let model = self.smoothed_model.as_model();
+
+        let plug_msg_handles = PlugMsgHandles {
+            ui_host_cb: ui_host_callback,
+            plug_to_ui_rx: UnsafeCell::new(plug_to_ui_rx),
+            ui_to_plug_tx: UnsafeCell::new(ui_to_plug_tx),
+            notify_dsp,
+        };
+
+        <<P::Model as Model<P>>::UI as UIModel<P, P::Model>>::from_model(
+            model,
+            plug_msg_handles,
+        )
     }
 
     ////
@@ -176,8 +273,8 @@ impl<P: Plugin> WrappedPlugin<P> {
 
         match ev.data {
             Data::Midi(m) => self.dispatch_midi_event(m),
-            Data::Parameter { param, val } => {
-                self.set_parameter_from_event(param, val);
+            Data::Parameter { param, val, notify_ui } => {
+                self.set_parameter_from_event(param, val, notify_ui);
             }
         }
     }
@@ -185,11 +282,45 @@ impl<P: Plugin> WrappedPlugin<P> {
     #[inline]
     pub(crate) fn process(&mut self, mut musical_time: MusicalTime,
         input: [&[f32]; 2], mut output: [&mut [f32]; 2],
-        mut nframes: usize,
-        poll_from_ui: bool)
+        mut nframes: usize)
     {
         let mut start = 0;
         let mut ev_idx = 0;
+
+        let mut ui_closed = false;
+        if let Some(mut ui_msg_handles) = self.ui_msg_handles.take() {
+            while let Some(msg) = ui_msg_handles.ui_to_plug_rx.pop() {
+                match msg {
+                    // The UI Model will only send parameter update messages if the plugin API
+                    // requested it.
+                    UIToPlugMsg::ParamChanged { param_idx, normalized } => {
+                        // What a monstrosity this is.
+                        let param = &<<P::Model as Model<P>>::Smooth as Parameters<P, <P::Model as Model<P>>::Smooth, <P::Model as Model<P>>::UI>>::PARAMS[param_idx];
+
+                        self.enqueue_event(Event { frame: 0, data: event::Data::Parameter {
+                            param,
+                            val: normalized,
+                            notify_ui: false, // Don't notify the UI since it was the one that changed it.
+                        } });
+                    }
+                    // We still need to update all non-parameter values from the UI.
+                    UIToPlugMsg::ValueChanged { cb, value } => {
+                        // This actually works!
+                        (cb)(&mut self.smoothed_model, value);
+                    }
+                    // Sent when the UI Model is dropped due to the user manually closing theplugin window.
+                    UIToPlugMsg::Closed => {
+                        ui_closed = true;
+                    }
+                }
+            }
+            // Get around borrow checker.
+            self.ui_msg_handles = Some(ui_msg_handles);
+        }
+        if ui_closed {
+            self.ui_msg_handles = None;
+            self.ui_handle = None;
+        }
 
         while nframes > 0 {
             let mut block_frames = nframes;
@@ -249,7 +380,7 @@ impl<P: Plugin> WrappedPlugin<P> {
                     musical_time: &musical_time
                 };
 
-                let proc_model = self.smoothed_model.process(block_frames, &mut self.plug, poll_from_ui);
+                let proc_model = self.smoothed_model.process(block_frames);
                 self.plug.process(&proc_model, &mut context);
             }
 
