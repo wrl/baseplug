@@ -8,7 +8,6 @@ use baseplug::{
     Plugin,
 };
 
-
 baseplug::model! {
     #[derive(Debug, Serialize, Deserialize)]
     struct GainModel {

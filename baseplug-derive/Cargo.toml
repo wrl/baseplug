@@ -13,3 +13,4 @@ proc-macro = true
 syn = { version = "1.0", features = ["default", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"
+ringbuf = "0.2"
