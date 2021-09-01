@@ -27,6 +27,9 @@ pub use declick::{
 pub mod event;
 pub use event::Event;
 
+mod message;
+pub use message::*;
+
 mod model;
 pub use model::*;
 
@@ -43,7 +46,6 @@ mod ui_param;
 pub use ui_param::{UIFloatParam, UIFloatValue};
 
 mod wrapper;
-pub use wrapper::{UIHostCallback, PlugToUIMsg, UIToPlugMsg, PlugMsgHandles};
 
 pub use baseplug_derive::model;
 
