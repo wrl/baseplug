@@ -103,6 +103,7 @@ impl<T> Declick<T>
 
     #[inline]
     pub fn process(&mut self, nframes: usize) {
+        self.update_status();
         self.fade.process(nframes);
     }
 
