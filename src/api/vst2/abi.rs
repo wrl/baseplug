@@ -44,6 +44,11 @@ extern "C" fn process_deprecated(_effect: *mut AEffect, _in: *const *const f32,
 {
 }
 
+extern "C" fn process_replacing_f64(_effect: *mut AEffect, _in: *const *const f64,
+    _out: *mut *mut f64, _nframes: i32)
+{
+}
+
 pub fn plugin_main<P: Plugin>(host_cb: HostCallbackProc, unique_id: &[u8; 4]) -> *mut AEffect {
     let mut flags = effect_flags::CAN_REPLACING | effect_flags::PROGRAM_CHUNKS;
 
@@ -92,6 +97,7 @@ pub fn plugin_main<P: Plugin>(host_cb: HostCallbackProc, unique_id: &[u8; 4]) ->
             version: 0,
 
             process_replacing: process_replacing::<P>,
+            process_double_replacing: process_replacing_f64,
         },
         
         host_cb,
