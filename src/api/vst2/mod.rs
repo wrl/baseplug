@@ -60,14 +60,6 @@ macro_rules! param_for_idx {
     }
 }
 
-#[repr(C)]
-struct Rect {
-    pub top: i16,
-    pub left: i16,
-    pub bottom: i16,
-    pub right: i16,
-}
-
 // represents an output buffer to send events to host
 #[repr(C)]
 pub struct OutgoingEvents {
