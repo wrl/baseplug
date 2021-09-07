@@ -595,16 +595,16 @@ fn enum_derive(input: DeriveInput) -> TokenStream {
     let variant_names_display = variant_names.clone();
     let variant_names_string = variant_names.clone().map(|x| x.to_string());
 
-    let variant_names_xlate_in = variant_names.clone();
-    let mut variant_index_xlate_in = Vec::new();
+    let variant_names_from = variant_names.clone();
+    let mut variant_index_from = Vec::new();
     for i in 1..variant_count + 1 {
-        variant_index_xlate_in.push(i as f32);
+        variant_index_from.push(i as f32);
     }
 
-    let variant_names_xlate_out = variant_names.clone();
-    let mut variant_index_xlate_out = Vec::new();
+    let variant_names_into = variant_names.clone();
+    let mut variant_index_into = Vec::new();
     for i in 1..variant_count + 1 {
-        variant_index_xlate_out.push(i as f32);
+        variant_index_into.push(i as f32);
     }
 
     quote!(
@@ -623,20 +623,45 @@ fn enum_derive(input: DeriveInput) -> TokenStream {
         }
 
         #[doc(hidden)]
+        impl baseplug::parameter::EnumModel for #model_name {
+
+        }
+
+        #[doc(hidden)]
+        impl From<f32> for #model_name {
+            fn from(value: f32) -> Self {
+                let value = value.min(1.0).max(0.0);
+                match value {
+                    #(n if n <= #variant_index_from / #variant_count as f32 => #model_name::#variant_names_from,)*
+                    _ => unreachable!(),
+                }
+            }
+        }
+
+        #[doc(hidden)]
+        impl Into<f32> for #model_name {
+            fn into(self) -> f32 {
+                match &self {
+                    #(#model_name::#variant_names_into => #variant_index_into / #variant_count as f32,)*
+                }
+            }
+        }
+
+        /*#[doc(hidden)]
         impl<P: Plugin, Model> Translatable<#model_name, P, Model> for #model_name {
             fn xlate_in(param: &Param<P, Model>, normalised: f32) -> #model_name {
                 let normalised = normalised.min(1.0).max(0.0);
                 match normalised {
-                    #(n if n <= #variant_index_xlate_in / #variant_count as f32 => #model_name::#variant_names_xlate_in,)*
+                    #(n if n <= #variant_index_from / #variant_count as f32 => #model_name::#variant_names_from,)*
                     _ => unreachable!(),
                 }
             }
         
             fn xlate_out(&self, param: &Param<P, Model>) -> f32 {
                 match &self {
-                    #(#model_name::#variant_names_xlate_out => #variant_index_xlate_out / #variant_count as f32,)*
+                    #(#model_name::#variant_names_into => #variant_index_into / #variant_count as f32,)*
                 }
             }
-        }     
+        }*/   
     )   
 }
