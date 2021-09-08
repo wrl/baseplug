@@ -594,6 +594,7 @@ fn enum_derive(input: DeriveInput) -> TokenStream {
 
     let variant_names_display = variant_names.clone();
     let variant_names_string = variant_names.clone().map(|x| x.to_string());
+    let variant_names_last = variant_names.clone().last();
 
     let variant_names_from_f32 = variant_names.clone();
     let mut variant_index_from_f32 = Vec::new();
@@ -632,7 +633,7 @@ fn enum_derive(input: DeriveInput) -> TokenStream {
                 let value = value.min(1.0).max(0.0);
                 match value {
                     #(n if n <= #variant_index_from_f32 / #variant_count as f32 => #model_name::#variant_names_from_f32,)*
-                    _ => unreachable!(),
+                    _ => #model_name::#variant_names_last,
                 }
             }
         }
