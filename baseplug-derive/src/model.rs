@@ -595,16 +595,16 @@ fn enum_derive(input: DeriveInput) -> TokenStream {
     let variant_names_display = variant_names.clone();
     let variant_names_string = variant_names.clone().map(|x| x.to_string());
 
-    let variant_names_from = variant_names.clone();
-    let mut variant_index_from = Vec::new();
+    let variant_names_from_f32 = variant_names.clone();
+    let mut variant_index_from_f32 = Vec::new();
     for i in 1..variant_count + 1 {
-        variant_index_from.push(i as f32);
+        variant_index_from_f32.push(i as f32);
     }
 
-    let variant_names_into = variant_names.clone();
-    let mut variant_index_into = Vec::new();
+    let variant_names_from_model = variant_names.clone();
+    let mut variant_index_from_model = Vec::new();
     for i in 1..variant_count + 1 {
-        variant_index_into.push(i as f32);
+        variant_index_from_model.push(i as f32);
     }
 
     quote!(
@@ -631,7 +631,7 @@ fn enum_derive(input: DeriveInput) -> TokenStream {
             fn from(value: f32) -> Self {
                 let value = value.min(1.0).max(0.0);
                 match value {
-                    #(n if n <= #variant_index_from / #variant_count as f32 => #model_name::#variant_names_from,)*
+                    #(n if n <= #variant_index_from_f32 / #variant_count as f32 => #model_name::#variant_names_from_f32,)*
                     _ => unreachable!(),
                 }
             }
@@ -641,7 +641,7 @@ fn enum_derive(input: DeriveInput) -> TokenStream {
         impl From<#model_name> for f32 {
             fn from(value: #model_name) -> Self {
                 match value {
-                    #(#model_name::#variant_names_into => #variant_index_into / #variant_count as f32,)*
+                    #(#model_name::#variant_names_from_model => #variant_index_from_model / #variant_count as f32,)*
                 }
             }
         }  
