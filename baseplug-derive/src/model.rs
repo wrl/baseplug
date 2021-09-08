@@ -624,7 +624,6 @@ fn enum_derive(input: DeriveInput) -> TokenStream {
 
         #[doc(hidden)]
         impl baseplug::parameter::EnumModel for #model_name {
-
         }
 
         #[doc(hidden)]
@@ -639,29 +638,12 @@ fn enum_derive(input: DeriveInput) -> TokenStream {
         }
 
         #[doc(hidden)]
-        impl Into<f32> for #model_name {
-            fn into(self) -> f32 {
-                match &self {
+        impl From<#model_name> for f32 {
+            fn from(value: #model_name) -> Self {
+                match value {
                     #(#model_name::#variant_names_into => #variant_index_into / #variant_count as f32,)*
                 }
             }
-        }
-
-        /*#[doc(hidden)]
-        impl<P: Plugin, Model> Translatable<#model_name, P, Model> for #model_name {
-            fn xlate_in(param: &Param<P, Model>, normalised: f32) -> #model_name {
-                let normalised = normalised.min(1.0).max(0.0);
-                match normalised {
-                    #(n if n <= #variant_index_from / #variant_count as f32 => #model_name::#variant_names_from,)*
-                    _ => unreachable!(),
-                }
-            }
-        
-            fn xlate_out(&self, param: &Param<P, Model>) -> f32 {
-                match &self {
-                    #(#model_name::#variant_names_into => #variant_index_into / #variant_count as f32,)*
-                }
-            }
-        }*/   
+        }  
     )   
 }

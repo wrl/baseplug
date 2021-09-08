@@ -181,13 +181,13 @@ pub trait EnumModel {
 }
 
 impl<P: Plugin, Model, T> Translatable<T, P, Model> for T
-    where T: From<f32> + Into<f32> + EnumModel  {
+    where T: Copy + From<f32> + EnumModel, f32: From<T>  {
     fn xlate_in(_param: &Param<P, Model>, normalised: f32) -> T {
         T::from(normalised)
     }
 
     fn xlate_out(&self, _param: &Param<P, Model>) -> f32 {
-        0.0
+        (*self).into()
     }
 }
 
