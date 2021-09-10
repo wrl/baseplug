@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     
-    use crate::{
+    use baseplug::{
         parameter::EnumModel,
     };
 
