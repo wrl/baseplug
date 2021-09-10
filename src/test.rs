@@ -53,7 +53,7 @@ mod tests {
     }
 
     #[test]
-    fn from_model_enumfor_f32() {
+    fn from_model_enum_for_f32() {
         let value: f32 = ModelEnum::A.into();
         assert_eq!(value, 0.0);
         let value: f32 = ModelEnum::B.into();
