@@ -31,9 +31,9 @@ mod tests {
     impl From<ModelEnum> for f32 {
         fn from(value: ModelEnum) -> Self {
             match value {
-                ModelEnum::A => 1.0 / 3.0,
-                ModelEnum::B => 2.0 / 3.0,
-                ModelEnum::C => 3.0 / 3.0,
+                ModelEnum::A => 0.0 / 3.0,
+                ModelEnum::B => 1.0 / 3.0,
+                ModelEnum::C => 2.0 / 3.0,
             }
         }
     }
@@ -55,10 +55,10 @@ mod tests {
     #[test]
     fn from_model_enumfor_f32() {
         let value: f32 = ModelEnum::A.into();
-        assert_eq!(value, 1.0 / 3.0);
+        assert_eq!(value, 0.0);
         let value: f32 = ModelEnum::B.into();
-        assert_eq!(value, 2.0 / 3.0);
+        assert_eq!(value, 1.0 / 3.0);
         let value: f32 = ModelEnum::C.into();
-        assert_eq!(value, 1.0);
+        assert_eq!(value, 2.0 / 3.0);
     }
 }

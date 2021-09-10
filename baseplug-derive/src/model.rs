@@ -604,7 +604,7 @@ fn enum_derive(input: DeriveInput) -> TokenStream {
 
     let variant_names_from_model = variant_names.clone();
     let mut variant_index_from_model = Vec::new();
-    for i in 1..variant_count + 1 {
+    for i in 0..variant_count {
         variant_index_from_model.push(i as f32);
     }
 
