@@ -457,8 +457,8 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
     let set_sample_rate_statements = fields_base.iter()
         .map(|FieldInfo { ident, wrapping, smooth_ms, .. }| {
             wrapping.as_ref().map(|_|
-                quote!(self.#ident.set_speed_ms(::baseplug::Real::from_f32(sample_rate),
-                ::baseplug::Real::from_f32(#smooth_ms))))
+                quote!(self.#ident.set_speed_ms(::baseplug::Num::from_f32(sample_rate),
+                ::baseplug::Num::from_f32(#smooth_ms))))
         });
 
     let as_model_fields = fields_base.iter()
