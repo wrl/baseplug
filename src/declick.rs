@@ -2,7 +2,8 @@ use std::fmt;
 
 use crate::{
     Smooth,
-    SmoothStatus
+    SmoothStatus,
+    num::Discrete
 };
 
 const DECLICK_SETTLE: f32 = 0.001;
@@ -15,7 +16,7 @@ pub struct DeclickOutput<'a, T> {
     pub status: SmoothStatus
 }
 
-pub struct Declick<T: Sized + Clone> {
+pub struct Declick<T: Discrete> {
     current: T,
     next: Option<T>,
     staged: Option<T>,
@@ -24,7 +25,7 @@ pub struct Declick<T: Sized + Clone> {
 }
 
 impl<T> Declick<T>
-    where T: Sized + Clone + Eq
+    where T: Discrete
 {
     pub fn new(initial: T) -> Self {
         Self {
@@ -123,7 +124,7 @@ impl<T> Declick<T>
 }
 
 impl<T> fmt::Debug for Declick<T>
-    where T: fmt::Debug + Sized + Clone
+    where T: fmt::Debug + Discrete
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct(concat!("Declick<", stringify!(T), ">"))

@@ -203,6 +203,7 @@ impl<'a> FieldInfo<'a> {
 
         let ident = &self.ident;
         let name = &param.name;
+        let ty = &self.ty;
         let short_name = param.short_name.as_ref()
             .map_or_else(|| quote!(None), |sn| quote!(Some(#sn)));
         let label = param.label.as_ref()
@@ -252,7 +253,7 @@ impl<'a> FieldInfo<'a> {
                     if val <= 0.00003162278 {
                         write!(w, "-inf")
                     } else {
-                        write!(w, "{:.1}", ::baseplug::util::coeff_to_db(val))
+                        write!(w, "{:.1}", ::baseplug::util::coeff_to_db(<#ty as ::baseplug::AsPrimitive<f32>>::as_(val)))
                     }
                 }
             ),
@@ -456,7 +457,8 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
     let set_sample_rate_statements = fields_base.iter()
         .map(|FieldInfo { ident, wrapping, smooth_ms, .. }| {
             wrapping.as_ref().map(|_|
-                quote!(self.#ident.set_speed_ms(sample_rate, #smooth_ms)))
+                quote!(self.#ident.set_speed_ms(::baseplug::Real::from_f32(sample_rate),
+                ::baseplug::Real::from_f32(#smooth_ms))))
         });
 
     let as_model_fields = fields_base.iter()

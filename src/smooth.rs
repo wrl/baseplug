@@ -2,7 +2,7 @@ use std::fmt;
 use std::ops;
 use std::slice;
 
-use num_traits::Float;
+use crate::num::Real;
 
 const SETTLE: f32 = 0.00001f32;
 
@@ -43,7 +43,7 @@ impl<'a, T, I> ops::Index<I> for SmoothOutput<'a, T>
     }
 }
 
-pub struct Smooth<T: Float> {
+pub struct Smooth<T: Real> {
     output: [T; crate::MAX_BLOCKSIZE],
     input: T,
 
@@ -55,7 +55,7 @@ pub struct Smooth<T: Float> {
 }
 
 impl<T> Smooth<T>
-    where T: Float + fmt::Display
+    where T: Real + fmt::Display
 {
     pub fn new(input: T) -> Self {
         Self {
@@ -105,6 +105,11 @@ impl<T> Smooth<T>
         }
     }
 
+    #[inline]
+    pub fn update_status(&mut self) -> SmoothStatus {
+        self.update_status_with_epsilon(T::from_f32(SETTLE))
+    }
+
     pub fn update_status_with_epsilon(&mut self, epsilon: T) -> SmoothStatus {
         let status = self.status;
 
@@ -146,22 +151,15 @@ impl<T> Smooth<T>
     pub fn is_active(&self) -> bool {
         self.status.is_active()
     }
-}
 
-impl Smooth<f32> {
-    pub fn set_speed_ms(&mut self, sample_rate: f32, ms: f32) {
-        self.b = (-1.0f32 / (ms * (sample_rate / 1000.0f32))).exp();
-        self.a = 1.0f32 - self.b;
-    }
-
-    #[inline]
-    pub fn update_status(&mut self) -> SmoothStatus {
-        self.update_status_with_epsilon(SETTLE)
+    pub fn set_speed_ms(&mut self, sample_rate: T, ms: T) {
+        self.b = (-T::one() / (ms * (sample_rate / T::from_f32(1000.0f32)))).exp();
+        self.a = T::one() - self.b;
     }
 }
 
 impl<T> From<T> for Smooth<T>
-    where T: Float + fmt::Display
+    where T: Real + fmt::Display
 {
     fn from(val: T) -> Self {
         Self::new(val)
@@ -170,7 +168,7 @@ impl<T> From<T> for Smooth<T>
 
 impl<T, I> ops::Index<I> for Smooth<T>
     where I: slice::SliceIndex<[T]>,
-          T: Float
+          T: Real
 {
     type Output = I::Output;
 
@@ -181,7 +179,7 @@ impl<T, I> ops::Index<I> for Smooth<T>
 }
 
 impl<T> fmt::Debug for Smooth<T>
-    where T: Float + fmt::Debug
+    where T: Real + fmt::Debug
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct(concat!("Smooth<", stringify!(T), ">"))
