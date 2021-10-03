@@ -16,7 +16,7 @@ pub struct DeclickOutput<'a, T> {
     pub status: SmoothStatus
 }
 
-pub struct Declick<T: Discrete> {
+pub struct Declick<T: Sized + Clone> {
     current: T,
     next: Option<T>,
     staged: Option<T>,
@@ -25,7 +25,7 @@ pub struct Declick<T: Discrete> {
 }
 
 impl<T> Declick<T>
-    where T: Discrete
+    where T: Sized + Clone + Eq
 {
     pub fn new(initial: T) -> Self {
         Self {
