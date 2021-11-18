@@ -8,7 +8,7 @@ pub trait Model<P: Plugin>: Sized + Default + 'static {
 }
 
 pub trait SmoothModel<P: Plugin, T: Model<P>>: Sized + 'static{
-    type Process<'proc>;
+    type Process<'proc> where Self: 'proc, P: 'proc, T: 'proc;
 
     fn from_model(model: T) -> Self;
     fn as_model(&self) -> T;
