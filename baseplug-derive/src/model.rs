@@ -308,6 +308,18 @@ impl<'a> FieldInfo<'a> {
 }
 
 pub(crate) fn derive(input: DeriveInput) -> TokenStream {
+    match &input.data {
+        syn::Data::Struct(_) => {
+            struct_derive(input)
+        },
+        syn::Data::Enum(_) => {
+            enum_derive(input)
+        },
+        _ => panic!("derive")
+    }    
+}
+
+fn struct_derive(input: DeriveInput) -> TokenStream {
     let attrs = &input.attrs;
     let model_vis = &input.vis;
     let model_name = &input.ident;
@@ -556,4 +568,83 @@ pub(crate) fn derive(input: DeriveInput) -> TokenStream {
             }
         };
     )
+}
+
+fn enum_derive(input: DeriveInput) -> TokenStream {
+    let attrs = &input.attrs;
+    let model_vis = &input.vis;
+    let model_name = &input.ident;
+    let data = &input.data;
+
+    let variant_names = match data {
+        Data::Enum(data_enum) => {
+            data_enum.variants.iter().map(|v| &v.ident)
+        },
+
+        _ => panic!()
+    };
+
+    let variant_count = match data {
+        Data::Enum(data_enum) => {
+            data_enum.variants.iter().count()
+        },
+
+        _ => panic!()
+    };
+
+    let variant_names_display = variant_names.clone();
+    let variant_names_string = variant_names.clone().map(|x| x.to_string());
+    let variant_names_last = variant_names.clone().last();
+
+    let variant_names_from_f32 = variant_names.clone();
+    let mut variant_index_from_f32 = Vec::new();
+    for i in 1..variant_count + 1 {
+        variant_index_from_f32.push(i as f32);
+    }
+
+    let variant_names_from_model = variant_names.clone();
+    let mut variant_index_from_model = Vec::new();
+    for i in 0..variant_count {
+        variant_index_from_model.push(i as f32);
+    }
+
+    quote!(
+        #( #attrs )*
+        #model_vis enum #model_name {
+            #( #variant_names ),*
+        }
+
+        #[doc(hidden)]
+        impl std::fmt::Display for #model_name {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                match *self {
+                    #(#model_name::#variant_names_display => write!(f, #variant_names_string)),*
+                }
+            }
+        }
+
+        #[doc(hidden)]
+        impl baseplug::parameter::EnumModel for #model_name {
+        }
+
+        #[doc(hidden)]
+        impl From<f32> for #model_name {
+            fn from(value: f32) -> Self {
+                let value = value.min(1.0).max(0.0);
+                match value {
+                    #(n if n <= #variant_index_from_f32 / #variant_count as f32 => #model_name::#variant_names_from_f32,)*
+                    _ => #model_name::#variant_names_last,
+                }
+            }
+        }
+
+        #[doc(hidden)]
+        impl From<#model_name> for f32 {
+            fn from(value: #model_name) -> Self {
+                match value {
+                    #(#model_name::#variant_names_from_model => #variant_index_from_model / #variant_count as f32,)*
+                }
+            }
+        }  
+    )   
 }
