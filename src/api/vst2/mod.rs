@@ -36,7 +36,7 @@ fn cstr_as_slice<'a>(ptr: *mut c_void, len: usize) -> &'a mut [u8] {
 fn cstrcpy(ptr: *mut c_void, src: &str, max_len: usize) {
     let dest = cstr_as_slice(ptr, max_len);
     let src_bytes = src.as_bytes();
-    let len = src_bytes.len().min(max_len - 1);
+    let len = Ord::min(src_bytes.len(), max_len - 1);
 
     dest[..len].copy_from_slice(&src_bytes[..len]);
     dest[len] = 0;

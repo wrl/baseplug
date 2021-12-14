@@ -2,7 +2,8 @@ use std::fmt;
 
 use crate::{
     Smooth,
-    SmoothStatus
+    SmoothStatus,
+    num::Discrete
 };
 
 const DECLICK_SETTLE: f32 = 0.001;
@@ -123,7 +124,7 @@ impl<T> Declick<T>
 }
 
 impl<T> fmt::Debug for Declick<T>
-    where T: fmt::Debug + Sized + Clone
+    where T: fmt::Debug + Discrete
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct(concat!("Declick<", stringify!(T), ">"))

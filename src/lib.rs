@@ -36,6 +36,14 @@ pub use plugin::*;
 mod time;
 pub use time::*;
 
+mod num;
+pub use num::{
+    Num,
+    Real,
+    AsPrimitive,
+    Discrete
+};
+
 mod wrapper;
 
 pub use baseplug_derive::model;
