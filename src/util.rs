@@ -1,13 +1,17 @@
 macro_rules! offset_of {
-    ($container:ty, $field:ident) => (
-        &(*(::std::ptr::null_mut::<$container>())).$field as *const _ as usize
-    )
+    ($struct:ty, $field:ident) => {{
+        let dummy = std::mem::MaybeUninit::<$struct>::uninit();
+        let base = dummy.as_ptr();
+        let field = std::ptr::addr_of!((*base).$field);
+
+        (field as *const std::ffi::c_void).offset_from(base as *const std::ffi::c_void)
+    }};
 }
 
 macro_rules! container_of {
-    ($ptr:ident, $container:ty, $field:ident) => ({
-        (($ptr as usize) - offset_of!($container, $field)) as *mut $container
-    })
+    ($ptr:ident, $container:ty, $field:ident) => {{
+        (($ptr as *mut std::ffi::c_void).offset(-offset_of!($container, $field)) as *mut $container)
+    }};
 }
 
 #[inline]
