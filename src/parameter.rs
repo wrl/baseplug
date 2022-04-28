@@ -26,7 +26,8 @@ pub enum Type {
 #[derive(Debug)]
 pub enum Unit {
     Generic,
-    Decibels
+    Decibels,
+    Percentage
 }
 
 pub struct Format<P: Plugin, Model> {
@@ -70,6 +71,8 @@ impl<P: Plugin, Model> Param<P, Model> {
     pub fn get_label(&self) -> &'static str {
         if let Unit::Decibels = self.unit {
             "dB"
+        } else if let Unit::Percentage = self.unit {
+            "%"
         } else {
             self.format.label
         }
