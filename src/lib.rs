@@ -41,4 +41,4 @@ mod wrapper;
 pub use baseplug_derive::model;
 
 
-const MAX_BLOCKSIZE: usize = 128;
+pub const MAX_BLOCKSIZE: usize = 128;
