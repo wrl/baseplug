@@ -247,8 +247,8 @@ impl<P: Plugin> VST2Adapter<P> {
 
                 let (width, height) = match self.ui_get_rect() {
                     Some((w, h)) => (w, h),
-                    None => unsafe {
-                        *ptr = ptr::null_mut();
+                    None => {
+                        unsafe { *ptr = ptr::null_mut() };
                         return 0;
                     }
                 };
@@ -263,9 +263,9 @@ impl<P: Plugin> VST2Adapter<P> {
                 unsafe {
                     // we never read from editor_rect, just set it.
                     *ptr = (&self.editor_rect as *const _) as *mut c_void;
-                    return 1;
                 }
-            },
+                return 1;
+            }
 
             effect_opcodes::EDIT_OPEN => {
                 return match self.ui_open(ptr) {
