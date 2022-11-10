@@ -1,6 +1,3 @@
-#![allow(incomplete_features)]
-#![feature(generic_associated_types)]
-
 use serde::{Serialize, Deserialize};
 
 use baseplug::{

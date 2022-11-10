@@ -1,5 +1,4 @@
 #![allow(incomplete_features)]
-#![feature(generic_associated_types)]
 #![feature(min_specialization)]
 
 use std::f32::consts::PI;
