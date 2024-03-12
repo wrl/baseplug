@@ -1,5 +1,3 @@
-use std::os::raw::c_void;
-
 use raw_window_handle::{RawWindowHandle, HasRawWindowHandle};
 
 
