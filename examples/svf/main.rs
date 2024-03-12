@@ -1,5 +1,7 @@
+#![feature(portable_simd)]
+
 use serde::{Serialize, Deserialize};
-use packed_simd::f32x4;
+use std::simd::f32x4;
 
 mod svf_simper;
 use svf_simper::SVFSimper;
@@ -61,17 +63,11 @@ impl Plugin for SVFPlugin {
         for i in 0..ctx.nframes {
             self.lpf.set(model.cutoff[i], model.resonance[i], ctx.sample_rate);
 
-            let frame = f32x4::new(input[0][i], input[1][i], 0.0, 0.0);
+            let frame = f32x4::from_array(
+                [input[0][i], input[1][i], 0.0, 0.0]);
             let lp = self.lpf.process(frame);
 
-            // would be nice to align this, but doesn't seem possible with #[repr(align)].
-            // ah well. not much of a perf penalty for unaligned writes these days.
-            let mut frame_out = [0.0f32; 4];
-
-            unsafe {
-                lp.write_to_slice_unaligned_unchecked(&mut frame_out);
-            }
-
+            let frame_out = lp.as_array();
             output[0][i] = frame_out[0];
             output[1][i] = frame_out[1];
         }

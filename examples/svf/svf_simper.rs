@@ -3,7 +3,7 @@
 
 use std::f32::consts;
 
-use packed_simd::f32x4;
+use std::simd::f32x4;
 
 
 pub struct SVFSimper {
@@ -48,8 +48,8 @@ impl SVFSimper {
         let v1 = (self.a1 * self.ic1eq) + (self.a2 * v3);
         let v2 = self.ic2eq + (self.a2 * self.ic1eq) + (self.a3 * v3);
 
-        self.ic1eq = (2.0 * v1) - self.ic1eq;
-        self.ic2eq = (2.0 * v2) - self.ic2eq;
+        self.ic1eq = (f32x4::splat(2.0) * v1) - self.ic1eq;
+        self.ic2eq = (f32x4::splat(2.0) * v2) - self.ic2eq;
 
         v2
     }
